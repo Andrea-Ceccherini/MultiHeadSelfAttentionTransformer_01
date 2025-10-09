@@ -1,0 +1,8 @@
+/mhsat_01_01/unsupervised_model_weights/unsupervised_model_weights/unsupervised_model_best.safetensors
+/mhsat_01_01/unsupervised_model_weights/unsupervised_model_weights/
+/mhsat_01_01/supervised_qa_model_files/
+/.venv/
+/mhsat_01_01/unsupervised_model_weights/
+/.idea/
+/mhsat_01_01/__pycache__/__init__.cpython-311.pyc
+/mhsat_01_01/__pycache__/mhsat_algorithms_for_custom_transformer_model_01_01_01.cpython-311.pyc
