@@ -517,6 +517,63 @@ def get_dataloaders(dataset_file_path_, tokenizer_, batch_size_, test_size=0.1, 
     return train_dataloader, val_dataloader, test_dataloader
 
 
+
+
+def apply_repetition_penalty(next_token_logits, sequence, penalty_factor=1.2):
+    """
+    Applica una penalità ai logit dei token che sono già presenti nella sequenza.
+
+    Args:
+        next_token_logits (torch.Tensor): Logit per il token successivo, di forma (batch_size, vocab_size).
+        sequence (torch.Tensor): La sequenza di token generata finora, di forma (batch_size, sequence_length).
+        penalty_factor (float): Il fattore di penalità. Un valore > 1 penalizza la ripetizione.
+
+    Returns:
+        torch.Tensor: Logit modificati.
+    """
+    print("apply_repetition_penalty() - BEGIN")
+
+
+    # 1. Estrai gli ID dei token da penalizzare (esclusi gli speciali come BOS)
+    # Assumiamo batch_size=1 (tipico nell'inferenza interattiva)
+    if sequence.dim() == 2 and sequence.size(0) == 1:
+        # sequence.squeeze(0) prende la sequenza di token.
+        # .unique() assicura che penalizziamo un token una sola volta, anche se ripetuto.
+        repeated_token_ids = sequence.squeeze(0).unique()
+    else:
+        # Gestione di batch_size > 1 o formato inatteso (semplificazione per questo script)
+        # Qui potresti implementare una logica più complessa per il batching.
+        return next_token_logits
+
+    # 2. Applica la penalità
+    # Creiamo un tensore di zeri delle dimensioni del vocabulario
+
+    # next_token_logits è un tensore 1D (per batch_size=1) o 2D (batch_size, vocab_size).
+    # Se il tensore è 2D, applichiamo la penalità al primo (e unico) elemento del batch.
+
+    # 2.1 Prendi i logit della prima (e unica) riga del batch
+    current_logits = next_token_logits[0]
+
+    # 2.2 Itera sugli ID dei token ripetuti e modifica i logit
+    for token_id in repeated_token_ids:
+        token_id = token_id.item()  # Estrae il valore intero
+        logit = current_logits[token_id]
+
+        if logit < 0:
+            # Penalizza i token poco probabili moltiplicandoli (per rendere il logit più negativo)
+            current_logits[token_id] = logit * penalty_factor
+        else:
+            # Penalizza i token probabili dividendoli (per renderli meno probabili)
+            current_logits[token_id] = logit / penalty_factor
+
+    # La funzione restituisce il tensore modificato
+    print(f"apply_repetition_penalty() - current_logits: {current_logits}")
+    print("apply_repetition_penalty() - END")
+    return next_token_logits
+
+
+
+
 def generate_text_with_beam(model_, tokenizer_, prompt_text_, max_output_length_=50, beam_width_=3, temperature_=1.0):
     """
     Generates text using the trained CustomTransformer model with beam search and temperature sampling.
@@ -535,7 +592,7 @@ def generate_text_with_beam(model_, tokenizer_, prompt_text_, max_output_length_
     Returns:
         str: The generated text.
     """
-    print("\ngenerate_text() - BEGIN (Beam Search with Temperature)")
+    print("\ngenerate_text() - BEGIN ")
     print("generate_text() - model_ =", model_)
     print("generate_text() - prompt_text_ =", prompt_text_)
     print("generate_text() - max_output_length_ =", max_output_length_)
@@ -617,7 +674,7 @@ def generate_text_with_beam(model_, tokenizer_, prompt_text_, max_output_length_
         numbers_of_steps_ = int(max_output_length_) # Cast to int here
         print("generate_text() - numbers_of_steps_ =", numbers_of_steps_)
         for step in range(numbers_of_steps_):
-            print(f"generate_text() - Step {step + 1}/{numbers_of_steps_} - BEGIN")
+            print(f"\ngenerate_text() - Step {step + 1}/{numbers_of_steps_} - BEGIN")
             all_candidates_ = []  # Store all possible next beam candidates for this step
 
             for log_prob, sequence in beams:
@@ -636,6 +693,17 @@ def generate_text_with_beam(model_, tokenizer_, prompt_text_, max_output_length_
                 print("generate_text() - extract the raw, un-normalized prediction scores logits) for the next token - BEGIN")
                 next_token_logits = output_logits_[:, -1, :] # Shape: (1, vocab_size)
                 print("generate_text() - extract the raw, un-normalized prediction scores logits) for the next token - END")
+
+
+                REPETITION_PENALTY = 1.2
+
+                # Applica la funzione ai logit prima della temperatura
+                next_token_logits = apply_repetition_penalty(
+                    next_token_logits,
+                    sequence,
+                    REPETITION_PENALTY
+                )
+
 
 
                 # --- Apply Temperature to Logits ---
@@ -669,13 +737,13 @@ def generate_text_with_beam(model_, tokenizer_, prompt_text_, max_output_length_
             for i, (log_p, seq) in enumerate(beams):
                 decoded_seq = tokenizer_.decode(seq.squeeze().tolist(), skip_special_tokens=False)
                 print(f"generate_text() - Beam {i + 1} (LogProb: {log_p:.4f}): '{decoded_seq}'")
-            print(f"generate_text() - DEBUG: Step {step + 1} Beams - END\n")
+            print(f"generate_text() - DEBUG: Step {step + 1} Beams - END")
 
             # Termination condition for the loop: if all active beams have finished (all ended with EOS)
             # or if we've reached max length.
             if all(seq[0, -1].item() == tokenizer_.eos_token_id and seq.size(1) > 1 for _, seq in
                    beams) or step == max_output_length_ - 1:
-                print("generate_text() - All beams have finished or max length reached. Terminating beam search.")
+                print("\ngenerate_text() - All beams have finished or max length reached. Terminating beam search.")
                 print(f"generate_text() - Step {step + 1}/{numbers_of_steps_} - END\n")
                 break  # Exit the loop, then process finished_beams/beams
             print(f"generate_text() - Step {step + 1}/{numbers_of_steps_} - END\n")
