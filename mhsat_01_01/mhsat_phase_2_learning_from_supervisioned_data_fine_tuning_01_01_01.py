@@ -27,7 +27,7 @@ if __name__ == "__main__":
 
     # Paths and Hyperparameters
     #dataset_file_path = "../../../Datasets/LiverDataset/liver_questions_and_answers_14931.csv"
-    dataset_file_path = "../../../Datasets/LiverDataset/liver_questions_and_answers_499.csv"
+    dataset_file_path = "../../../Datasets/LiverDataset/liver_questions_and_answers_999.csv"
 
     if not os.path.exists(dataset_file_path):
         print(f"__main__() - Error: The file '{dataset_file_path}' was not found.")

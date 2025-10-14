@@ -460,15 +460,53 @@ def create_model_configuration(model_save_dir_, input_vocab_size_, target_vocab_
 
 def tokenize_dataset(tokenizer_, questions_, answers_, max_length_):
     print("tokenize_dataset() - BEGIN")
-    tokenized_data_ = tokenizer_(
+
+    # Ottieni i token BOS ed EOS. Spesso sono lo stesso ID per GPT-2.
+    bos_token = tokenizer_.bos_token if tokenizer_.bos_token else tokenizer_.eos_token
+    eos_token = tokenizer_.eos_token
+
+    # 1. Prepara le risposte (Target del Decoder)
+    # Target = [BOS] Risposta [EOS]
+    processed_answers = [
+        bos_token + " " + answer + " " + eos_token
+        for answer in answers_
+    ]
+
+    # 2. Tokenizza la domanda (Input dell'Encoder)
+    # L'Encoder ha bisogno della domanda con [CLS]/[SEP] se il tokenizer lo supporta.
+    # Usiamo semplicemente la tokenizzazione normale per l'input.
+    encoder_tokenized = tokenizer_(
         questions_,
-        text_target=answers_,
         truncation=True,
         padding='max_length',
-        max_length=max_length_
+        max_length=max_length_,
+        return_tensors="pt"  # Ritorna tensori PyTorch
     )
+
+    # 3. Tokenizza le risposte (Target del Decoder)
+    # Dobbiamo trattare questo come un target separato per ottenere le 'labels'
+    decoder_tokenized = tokenizer_(
+        processed_answers,
+        truncation=True,
+        padding='max_length',
+        max_length=max_length_,
+        return_tensors="pt"
+    )
+
+    # 4. Combina i dati tokenizzati
+    # Per un modello Encoder-Decoder customizzato, hai bisogno di:
+    # 'input_ids' (Domanda), 'attention_mask' (Domanda), e 'labels' (Risposta).
+    # Potrebbe essere necessario il 'decoder_attention_mask'
+
+    tokenized_data = {
+        'input_ids': encoder_tokenized['input_ids'],  # L'input dell'Encoder (Domanda)
+        'attention_mask': encoder_tokenized['attention_mask'],  # Mask dell'Encoder
+        'labels': decoder_tokenized['input_ids'],  # Il Target/Labels del Decoder ([BOS] Risposta [EOS])
+        'decoder_attention_mask': decoder_tokenized['attention_mask']
+    }
+
     print("tokenize_dataset() - END")
-    return tokenized_data_
+    return tokenized_data
 
 
 def get_dataloaders(dataset_file_path_, tokenizer_, batch_size_, test_size=0.1, val_size=0.1):
@@ -695,7 +733,7 @@ def generate_text_with_beam(model_, tokenizer_, prompt_text_, max_output_length_
                 print("generate_text() - extract the raw, un-normalized prediction scores logits) for the next token - END")
 
 
-                REPETITION_PENALTY = 1.2
+                REPETITION_PENALTY = 3.2
 
                 # Applica la funzione ai logit prima della temperatura
                 next_token_logits = apply_repetition_penalty(

@@ -20,6 +20,11 @@ def create_tokenizer(model_directory_path_):
 
 if __name__ == "__main__":
     print("__main__() - BEGIN")
+
+    temperature = 1.0
+    max_output_length = 50
+    beam_width = 7
+
     # FIX: Use the correct directory path from the supervised training script
     model_directory_path = "supervised_qa_model_files"
 
@@ -87,9 +92,7 @@ if __name__ == "__main__":
     question = ""
     print(f"__main__() - question: '{question}'")
 
-    temperature = 0.8
-    max_output_length = 50
-    beam_width = 3
+
 
     while True:
         user_input = input("__main__() - Enter your question (or type 'exit' to quit): ")

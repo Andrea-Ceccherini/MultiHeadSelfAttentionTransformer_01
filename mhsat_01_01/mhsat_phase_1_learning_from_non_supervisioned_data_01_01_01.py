@@ -190,7 +190,9 @@ if __name__ == "__main__":
     for filename in os.listdir(text_data_folder):
         if filename.endswith(".txt"):
             file_path = os.path.join(text_data_folder, filename)
-            with open(file_path, 'r', encoding='utf-8') as f:
+
+            # 🎯 Modifica qui: Usa la codifica 'latin-1' (o 'windows-1252')
+            with open(file_path, 'r', encoding='latin-1') as f:
                 raw_text_data.append(f.read())
 
     if not raw_text_data:
