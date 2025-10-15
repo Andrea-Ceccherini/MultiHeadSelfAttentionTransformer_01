@@ -1,22 +1,18 @@
 
 import requests
 import os
-import re
 
 def download_gutenberg_australia_text(download_url_, output_dir_):
     """
-    Scarica un eBook specifico in formato plain text da Project Gutenberg Australia.
+    Download a specific eBook in plain text format from Project Gutenberg Australia.
 
-    Project Gutenberg Australia (gutenberg.net.au) non ha un'API di massa per il download
-    come il sito principale. È necessario costruire l'URL del file di testo esatto.
+    Project Gutenberg Australia (gutenberg.net.au) does not have a bulk download API.
+    Like the main site. You need to construct the exact URL of the text file.
 
-    :param download_url_: L'ID numerico del libro nel catalogo (es. 1000 per 'The Iliad').
-    :param output_dir_: La directory in cui salvare il file.
+    :param download_url_:
+    :param output_dir_: The directory to save the file in.
     """
     # base_url = "https://gutenberg.net.au"
-
-
-
 
     txt_file_name_split_ = download_url_.split("/")
     txt_file_name_ = txt_file_name_split_[3] + "_" + txt_file_name_split_[4]
@@ -36,17 +32,17 @@ def download_gutenberg_australia_text(download_url_, output_dir_):
         raw_text = response.content.decode('latin-1')
 
 
-        # 2. Salvataggio del testo
+        # Saving text
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(raw_text)
 
         print(f"✅ Success: '{txt_file_name_}' downloaded and saved in '{output_dir_}'.")
 
     except requests.exceptions.RequestException as e:
-        print(f"❌ Errore durante il download di {txt_file_name_}: {e}")
-        print("Ciò potrebbe indicare che l'ID del libro non esiste o che il formato del file è diverso.")
+        print(f"❌ Error while downloading {txt_file_name_}: {e}")
+        print("This could mean that the book ID doesn't exist or that the file format is different.")
     except Exception as e:
-        print(f"❌ Si è verificato un errore inatteso: {e}")
+        print(f"❌ An unexpected error occurred: {e}")
 
 
 if __name__ == "__main__":
