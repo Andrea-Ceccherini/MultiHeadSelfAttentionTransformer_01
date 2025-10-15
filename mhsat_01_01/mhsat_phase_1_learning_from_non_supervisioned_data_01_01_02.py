@@ -1,11 +1,23 @@
 import torch
 from torch.utils.data import DataLoader, Dataset
-from transformers import AutoTokenizer
 import os
 from safetensors.torch import save_file
 from mhsat_01_01.mhsat_algorithms_for_custom_transformer_model_01_01_01 import CustomTransformer, \
     NUM_LAYERS, TOKENIZATION_MAX_LENGTH, D_MODEL, NUM_HEADS, D_FF, DROPOUT, load_gpt2_tokenizer
+from datetime import datetime
 
+
+def calculate_elapsed_time(begin_time_, end_time_):
+    elapsed_time_ = end_time_ - begin_time_
+    days = elapsed_time_.days
+    seconds = elapsed_time_.seconds
+    milliseconds = elapsed_time_.microseconds // 1000
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    years, days = divmod(days, 365)
+    months, days = divmod(days, 30)
+    formatted_elapsed_time = f"{years:04}:{months:02}:{days:02}:{hours:02}:{minutes:02}:{seconds:02}:{milliseconds:03}"
+    return formatted_elapsed_time
 
 # A simple Dataset class for unsupervised text
 class UnsupervisedTextDataset(Dataset):
@@ -124,12 +136,33 @@ def model_training_unsupervised(epochs, dataloader, device, optimizer, criterion
     print("model_training_unsupervised() - END")
 
 
-if __name__ == "__main__":
-    print("__main__() - BEGIN")
-    # Sostituisci "gpt2" con il tokenizer che intendi usare
-    books_text_data_folder = "../../../Datasets/Books/"
-    wikipedia_text_data_folder = "../../../Datasets/WikipediaData/"
+# Funzione Helper per caricare i dati da una specifica cartella
+def load_text_data_from_folder(folder_path, data_list):
+    if not os.path.exists(folder_path):
+        print(f"__main__() - Warning: The folder '{folder_path}' was not found. Skipping.")
+        return 0
 
+    files_loaded = 0
+    for filename in os.listdir(folder_path):
+        if filename.endswith(".txt"):
+            file_path = os.path.join(folder_path, filename)
+            try:
+                # Usa la codifica 'latin-1' per gestire eventuali errori di decodifica
+                with open(file_path, 'r', encoding='latin-1') as f:
+                    data_list.append(f.read())
+                    files_loaded += 1
+            except Exception as e:
+                print(f"__main__() - Error reading file {file_path}: {e}")
+    return files_loaded
+
+
+if __name__ == "__main__":
+
+    print("__main__() - BEGIN")
+    begin_time = datetime.now()
+    # Sostituisci "gpt2" con il tokenizer che intendi usare
+    books_text_data_folder = "../../../Datasets/Txt_Books/"
+    wikipedia_text_data_folder = "../../../Datasets/WikipediaData/"
 
     tokenizer, tokenizer_len = load_gpt2_tokenizer()
 
@@ -159,7 +192,6 @@ if __name__ == "__main__":
     print(f"__main__() - input_vocab_size: {input_vocab_size}")
     print(f"__main__() - target_vocab_size: {target_vocab_size}")
 
-
     # Istanzia il modello
     model = CustomTransformer(
         input_vocab_size=input_vocab_size,
@@ -184,21 +216,23 @@ if __name__ == "__main__":
     model.to(device)
 
     # --- Prepare your raw text data from a folder ---
-    if not os.path.exists(books_text_data_folder):
-        print(f"__main__() - Error: The folder '{books_text_data_folder}' was not found.")
-        exit()
+    raw_text_data = []  # Inizializza la lista VUOTA
 
-    raw_text_data = []
-    for filename in os.listdir(books_text_data_folder):
-        if filename.endswith(".txt"):
-            file_path = os.path.join(books_text_data_folder, filename)
 
-            # 🎯 Modifica qui: Usa la codifica 'latin-1' (o 'windows-1252')
-            with open(file_path, 'r', encoding='latin-1') as f:
-                raw_text_data.append(f.read())
 
+
+
+    # 1. Caricamento dei dati da 'books_text_data_folder'
+    print(f"\n__main__() - Loading data from: {books_text_data_folder}")
+    num_books_docs = load_text_data_from_folder(books_text_data_folder, raw_text_data)
+
+    # 2. Caricamento dei dati da 'wikipedia_text_data_folder'
+    print(f"\n__main__() - Loading data from: {wikipedia_text_data_folder}")
+    num_wiki_docs = load_text_data_from_folder(wikipedia_text_data_folder, raw_text_data)
+
+    # 3. Verifica e calcolo totale
     if not raw_text_data:
-        print(f"__main__() - Error: No text files found in '{books_text_data_folder}'.")
+        print(f"__main__() - Error: No text files found in the specified folders.")
         exit()
 
     # Calculate and print the total number of words
@@ -207,7 +241,9 @@ if __name__ == "__main__":
         # Split the text by whitespace and add the number of words
         total_words += len(text.split())
 
-    print(f"__main__() - Number of documents loaded: {len(raw_text_data)}")
+    print(f"\n__main__() - Number of documents loaded (Books): {num_books_docs}")
+    print(f"__main__() - Number of documents loaded (Wikipedia): {num_wiki_docs}")
+    print(f"__main__() - Total number of documents loaded: {len(raw_text_data)}")
     print(f"__main__() - Total number of words loaded: {total_words}")
     # -------------------------------------------------------------
 
@@ -222,7 +258,8 @@ if __name__ == "__main__":
 
     # 3. Create a Dataset and a DataLoader
     unsupervised_dataset = UnsupervisedTextDataset(tokenized_data)
-    unsupervised_dataloader = DataLoader(unsupervised_dataset, batch_size=2, shuffle=True)
+    # Aumentato batch_size per sfruttare meglio la GPU, se disponibile
+    unsupervised_dataloader = DataLoader(unsupervised_dataset, batch_size=32, shuffle=True)
 
     # 4. Define the optimizer and loss function
     # L'ottimizzatore deve essere definito DOPO il ridimensionamento dei parametri del modello
@@ -248,5 +285,9 @@ if __name__ == "__main__":
         patience=patience
     )
     print("\n__main__() - Unsupervised training process - END\n")
+
+    end_time = datetime.now()
+    elapsed_time = calculate_elapsed_time(begin_time, end_time)
+    print("__main__() - Elapsed Time =", elapsed_time)
 
     print("__main__() - END")

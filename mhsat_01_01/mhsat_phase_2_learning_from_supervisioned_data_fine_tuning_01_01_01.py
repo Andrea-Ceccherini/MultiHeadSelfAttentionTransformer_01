@@ -10,20 +10,20 @@ from mhsat_01_01.mhsat_algorithms_for_custom_transformer_model_01_01_01 import T
     D_MODEL, NUM_HEADS, D_FF, DROPOUT, load_gpt2_tokenizer
 
 def calculate_elapsed_time(begin_time_, end_time_):
-    elapsed_time = end_time_ - begin_time_
-    days = elapsed_time.days
-    seconds = elapsed_time.seconds
-    milliseconds = elapsed_time.microseconds // 1000
+    elapsed_time_ = end_time_ - begin_time_
+    days = elapsed_time_.days
+    seconds = elapsed_time_.seconds
+    milliseconds = elapsed_time_.microseconds // 1000
     hours, remainder = divmod(seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     years, days = divmod(days, 365)
     months, days = divmod(days, 30)
-    formatted_elapsed_time = f"{years:04}:{months:02}:{days:02}:{hours:02}:{minutes:02}:{seconds:02}:{milliseconds:03}"
-    return formatted_elapsed_time
+    formatted_elapsed_time_ = f"{years:04}:{months:02}:{days:02}:{hours:02}:{minutes:02}:{seconds:02}:{milliseconds:03}"
+    return formatted_elapsed_time_
 
 if __name__ == "__main__":
     print("__main__() - BEGIN")
-    begin_time_ = datetime.now()
+    begin_time = datetime.now()
 
     # Paths and Hyperparameters
     #dataset_file_path = "../../../Datasets/LiverDataset/liver_questions_and_answers_14931.csv"
@@ -154,7 +154,7 @@ if __name__ == "__main__":
         f"__main__() - merges.txt, special_tokens_map.json, tokenizer.json, tokenizer_config.json, vocab.json saved to {model_save_dir}")
     print("__main__() - Saving model and tokenizer to the specified directory - COMPLETED")
 
-    end_time_ = datetime.now()
-    elapsed_ = calculate_elapsed_time(begin_time_, end_time_)
-    print("__main__() - Elapsed Time =", elapsed_)
+    end_time = datetime.now()
+    elapsed_time = calculate_elapsed_time(begin_time, end_time)
+    print("__main__() - Elapsed Time =", elapsed_time)
     print("__main__() - END")
