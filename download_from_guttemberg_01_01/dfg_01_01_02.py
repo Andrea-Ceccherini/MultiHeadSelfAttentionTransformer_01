@@ -1,0 +1,257 @@
+
+import requests
+import os
+
+def download_gutenberg_australia_text(download_url_, output_dir_):
+    """
+    Download a specific eBook in plain text format from Project Gutenberg Australia.
+
+    Project Gutenberg Australia (gutenberg.net.au) does not have a bulk download API.
+    Like the main site. You need to construct the exact URL of the text file.
+
+    :param download_url_:
+    :param output_dir_: The directory to save the file in.
+    """
+    # base_url = "https://gutenberg.net.au"
+
+    txt_file_name_split_ = download_url_.split("/")
+    txt_file_name_ = txt_file_name_split_[3] + "_" + txt_file_name_split_[4]
+
+    # Create output directory if it does not exist
+    os.makedirs(output_dir_, exist_ok=True)
+    output_file_name_path = os.path.join(output_dir_, txt_file_name_)
+
+    print(f"Attempting to download from: {download_url_}")
+
+    try:
+        # Use stream=True for efficient downloading, although for .txt files it is not strictly necessary
+        response = requests.get(download_url_, stream=True)
+        response.raise_for_status()  # Throws an exception for error status codes (4xx or 5xx)
+
+        # The content is decoded as text
+        raw_text = response.content.decode('latin-1')
+
+
+        # Saving text
+        with open(output_file_name_path, 'w', encoding='utf-8') as f:
+            f.write(raw_text)
+
+        print(f"✅ Success: '{txt_file_name_}' downloaded and saved in '{output_dir_}'.")
+
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Error while downloading {txt_file_name_}: {e}")
+        print("This could mean that the book ID doesn't exist or that the file format is different.")
+    except Exception as e:
+        print(f"❌ An unexpected error occurred: {e}")
+
+
+if __name__ == "__main__":
+
+    folder_document_path = "../../../Datasets/Au_Books/"
+
+    download_url_list_a = ["https://gutenberg.net.au/ebooks03/0301501.txt",
+                           "https://gutenberg.net.au/ebooks02/0200041.txt",
+                           "https://gutenberg.net.au/ebooks03/0301261.txt",
+                           "https://gutenberg.net.au/ebooks07/0700261.txt",
+                           "https://gutenberg.net.au/ebooks13/1306151.txt",
+                           "https://gutenberg.net.au/ebooks14/1402761.txt",
+                           "https://gutenberg.net.au/ebooks13/1306031.txt",
+                           "https://gutenberg.net.au/ebooks14/1402121.txt",
+                           "https://gutenberg.net.au/ebooks17/1700111.txt",
+                           "https://gutenberg.net.au/ebooks06/0602951.txt",
+                           "https://gutenberg.net.au/ebooks06/0602941.txt",
+                           "https://gutenberg.net.au/ebooks/fr100257.txt",
+                           "https://gutenberg.net.au/ebooks06/0609271.txt",
+                           "https://gutenberg.net.au/ebooks/fr100255.txt",
+                           "https://gutenberg.net.au/ebooks/fr100259.txt",
+                           "https://gutenberg.net.au/ebooks/fr100258.txt",
+                           "https://gutenberg.net.au/ebooks/fr100260.txt",
+                           "https://gutenberg.net.au/ebooks/fr100256.txt",
+                           "https://gutenberg.net.au/ebooks10/1000461.txt",
+                           "https://gutenberg.net.au/ebooks06/0602961.txt",
+                           "https://gutenberg.net.au/ebooks08/0800851.txt",
+                           "https://gutenberg.net.au/ebooks06/0602891.txt",
+                           "https://gutenberg.net.au/ebooks06/0609301.txt",
+                           "https://gutenberg.net.au/ebooks06/0609281.txt",
+                           "https://gutenberg.net.au/ebooks/fr100257.txt",
+                           "https://gutenberg.net.au/ebooks13/1300401.txt",
+                           "https://gutenberg.net.au/ebooks08/0800891.txt",
+                           "https://gutenberg.net.au/ebooks13/1306151.txt",
+                           "https://gutenberg.net.au/ebooks08/0800931.txt",
+                           "https://gutenberg.net.au/ebooks06/0602951.txt",
+                           "https://gutenberg.net.au/ebooks06/0602941.txt",
+                           "https://gutenberg.net.au/ebooks08/0800851.txt",
+                           "https://gutenberg.net.au/ebooks06/0609251.txt",
+                           "https://gutenberg.net.au/ebooks06/0609241.txt",
+                           "https://gutenberg.net.au/ebooks06/0603011.txt",
+                           "https://gutenberg.net.au/ebooks06/0603021.txt",
+                           "https://gutenberg.net.au/ebooks06/0603031.txt",
+                           "https://gutenberg.net.au/ebooks06/0603041.txt",
+                           "https://gutenberg.net.au/ebooks/fr100261.txt",
+                           "https://gutenberg.net.au/ebooks/fr100262.txt",
+                           "https://gutenberg.net.au/ebooks/fr100263.txt",
+                           "https://gutenberg.net.au/ebooks/fr100264.txt",
+                           "https://gutenberg.net.au/ebooks/fr100265.txt",
+                           "https://gutenberg.net.au/ebooks/fr100266.txt",
+                           "https://gutenberg.net.au/ebooks/fr100267.txt",
+                           "https://gutenberg.net.au/ebooks/fr100268.txt",
+                           "https://gutenberg.net.au/ebooks/fr100269.txt",
+                           "https://gutenberg.net.au/ebooks/fr100270.txt",
+                           "https://gutenberg.net.au/ebooks/fr100271.txt",
+                           "https://gutenberg.net.au/ebooks/fr100272.txt",
+                           "https://gutenberg.net.au/ebooks/fr100273.txt",
+                           "https://gutenberg.net.au/ebooks/fr100274.txt",
+                           "https://gutenberg.net.au/ebooks/fr100275.txt",
+                           "https://gutenberg.net.au/ebooks/fr100276.txt",
+                           "https://gutenberg.net.au/ebooks/fr100277.txt",
+                           "https://gutenberg.net.au/ebooks/fr100278.txt",
+                           "https://gutenberg.net.au/ebooks/fr100279.txt",
+                           "https://gutenberg.net.au/ebooks/fr100280.txt",
+                           "https://gutenberg.net.au/ebooks/fr100281.txt",
+                           "https://gutenberg.net.au/ebooks05/0500531.txt",
+                           "https://gutenberg.net.au/ebooks05/0500521.txt",
+                           "https://gutenberg.net.au/ebooks05/0500861.txt",
+                           "https://gutenberg.net.au/ebooks05/0500431.txt",
+                           "https://gutenberg.net.au/ebooks05/0500831.txt",
+                           "https://gutenberg.net.au/ebooks06/0600221.txt",
+                           "https://gutenberg.net.au/ebooks05/0500651.txt",
+                           "https://gutenberg.net.au/ebooks06/0602071.txt",
+                           "https://gutenberg.net.au/ebooks06/0602441.txt",
+                           "https://gutenberg.net.au/ebooks06/0602451.txt",
+                           "https://gutenberg.net.au/ebooks11/1100011.txt",
+                           "https://gutenberg.net.au/ebooks13/1302401.txt",
+                           "https://gutenberg.net.au/ebooks02/0200541.txt",
+                           "https://gutenberg.net.au/ebooks07/0700081.txt",
+                           "https://gutenberg.net.au/ebooks04/0400491.txt",
+                           "https://gutenberg.net.au/ebooks/fr100292.txt",
+                           "https://gutenberg.net.au/ebooks/fr100293.txt",
+                           "https://gutenberg.net.au/ebooks/fr100294.txt",
+                           "https://gutenberg.net.au/ebooks/fr100295.txt",
+                           "https://gutenberg.net.au/ebooks10/1000721.txt",
+                           "https://gutenberg.net.au/ebooks12/1202031.txt",
+                           "https://gutenberg.net.au/ebooks06/0605071.txt",
+                           "https://gutenberg.net.au/ebooks06/0605081.txt",
+                           "https://gutenberg.net.au/ebooks06/0604181.txt",
+                           "https://gutenberg.net.au/ebooks06/0605091.txt",
+                           "https://gutenberg.net.au/ebooks06/0605101.txt",
+                           "https://gutenberg.net.au/ebooks06/0605121.txt"]
+
+    download_url_list_b_1 = ["https://gutenberg.net.au/ebooks03/0300451.txt",   # https://gutenberg.net.au/plusfifty-a-m.html#letterA
+                           "https://gutenberg.net.au/ebooks06/0605111.txt",
+                           "https://gutenberg.net.au/ebooks/e00004.txt",
+                           "https://gutenberg.net.au/ebooks/e00005.txt",
+                           "https://gutenberg.net.au/ebooks05/0501141.txt",
+                           "https://gutenberg.net.au/ebooks/c00057.txt",
+                           "https://gutenberg.net.au/ebooks/c00049.txt",
+                           "https://gutenberg.net.au/ebooks/fr100011.txt",
+                           "https://gutenberg.net.au/ebooks/fr100024.txt",
+                           "https://gutenberg.net.au/ebooks06/0605141.txt",
+                           "https://gutenberg.net.au/ebooks07/0701241.txt",
+                             "https://gutenberg.net.au/ebooks05/0500731.txt",
+                             "https://gutenberg.net.au/ebooks06/0605151.txt",
+                             "https://gutenberg.net.au/ebooks/c00065.txt",
+                             "https://gutenberg.net.au/ebooks06/0608721.txt",
+                             "https://gutenberg.net.au/ebooks06/0607421.txt",
+                             "https://gutenberg.net.au/ebooks06/0607431.txt",
+                             "https://gutenberg.net.au/ebooks13/1300021.txt",
+                             "https://gutenberg.net.au/ebooks13/1305951.txt",
+                             "https://gutenberg.net.au/ebooks13/1304171.txt",
+                             "https://gutenberg.net.au/ebooks13/1302931.txt",
+                             "https://gutenberg.net.au/ebooks13/1300361.txt",
+                             "https://gutenberg.net.au/ebooks13/1300761.txt",
+                             "https://gutenberg.net.au/ebooks13/1301631.txt",
+                             "https://gutenberg.net.au/ebooks13/1305211.txt",
+                             "https://gutenberg.net.au/ebooks13/1305571.txt",
+                             "https://gutenberg.net.au/ebooks13/1302461.txt",
+                             "https://gutenberg.net.au/ebooks13/1301811.txt",
+                             "https://gutenberg.net.au/ebooks13/1302101.txt",
+                             "https://gutenberg.net.au/ebooks13/1301781.txt",
+                             "https://gutenberg.net.au/ebooks13/1301751.txt",
+                             "https://gutenberg.net.au/ebooks13/1302111.txt",
+                             "https://gutenberg.net.au/ebooks13/1302291.txt",
+                             "https://gutenberg.net.au/ebooks13/1302301.txt",
+                             "https://gutenberg.net.au/ebooks13/1302321.txt",
+                             "https://gutenberg.net.au/ebooks13/1302331.txt",
+                             "https://gutenberg.net.au/ebooks13/1302311.txt",
+                             "https://gutenberg.net.au/ebooks13/1302451.txt",
+                             "https://gutenberg.net.au/ebooks13/1302431.txt",
+                             "https://gutenberg.net.au/ebooks13/1304781.txt",
+                             "https://gutenberg.net.au/ebooks06/0607041.txt",
+                             "https://gutenberg.net.au/ebooks08/0800591.txt",
+                             "https://gutenberg.net.au/ebooks04/0400661.txt",
+                             "https://gutenberg.net.au/ebooks05/0500301.txt",
+                             "https://gutenberg.net.au/ebooks06/0607031.txt",
+                             "https://gutenberg.net.au/ebooks06/0605191.txt",
+                             "https://gutenberg.net.au/ebooks07/0700711.txt",
+                             "https://gutenberg.net.au/ebooks01/0100141.txt",
+                             "https://gutenberg.net.au/ebooks/x00002.txt",
+                             "https://gutenberg.net.au/ebooks/x00003.txt",
+                             "https://gutenberg.net.au/ebooks/e00001.txt",
+                             "https://gutenberg.net.au/ebooks/fr100238.txt",
+                             "https://gutenberg.net.au/ebooks05/0500671.txt",
+                             "https://gutenberg.net.au/ebooks23/2300921.txt",
+                             "https://gutenberg.net.au/ebooks/e00003.txt",
+                             "https://gutenberg.net.au/ebooks/e00006.txt",
+                             "https://gutenberg.net.au/ebooks07/0700151.txt",
+                             "https://gutenberg.net.au/ebooks04/0400341.txt",
+                             "https://gutenberg.net.au/ebooks04/0400461.txt",
+                             "https://gutenberg.net.au/ebooks11/1100201.txt",
+                             "https://gutenberg.net.au/ebooks06/0602101.txt",
+                             "https://gutenberg.net.au/ebooks06/0602111.txt",
+                             "https://gutenberg.net.au/ebooks06/0602121.txt",
+                             "https://gutenberg.net.au/ebooks/e00007.txt",
+                             "https://gutenberg.net.au/ebooks07/0700431.txt",
+                             "https://gutenberg.net.au/ebooks03/0300841.txt",
+                             "https://gutenberg.net.au/ebooks06/0602901.txt",
+                             "https://gutenberg.net.au/ebooks07/0700461.txt",
+                             "https://gutenberg.net.au/ebooks/fr100014.txt",
+                             "https://gutenberg.net.au/ebooks09/0900541.txt",
+                             "https://gutenberg.net.au/ebooks09/0900961.txt",
+                             "https://gutenberg.net.au/ebooks03/0301581.txt",
+                             "https://gutenberg.net.au/ebooks06/0605201.txt",
+                             "https://gutenberg.net.au/ebooks/m00013.txt",
+                             "https://gutenberg.net.au/ebooks06/0600011.txt",
+                             "https://gutenberg.net.au/ebooks05/0500891.txt",
+                             "https://gutenberg.net.au/ebooks05/0501131.txt",
+                             "https://gutenberg.net.au/ebooks05/0500961.txt",
+                             "https://gutenberg.net.au/ebooks05/0501151.txt",
+                             "https://gutenberg.net.au/ebooks06/0605171.txt",
+                             "https://gutenberg.net.au/ebooks05/0501221.txt",
+                             "https://gutenberg.net.au/ebooks05/0501171.txt",
+                             "https://gutenberg.net.au/ebooks06/0605211.txt",
+                             "https://gutenberg.net.au/ebooks08/0801031.txt",
+                             "https://gutenberg.net.au/ebooks06/0605221.txt",
+                             "https://gutenberg.net.au/ebooks06/0601411.txt",
+                             "https://gutenberg.net.au/ebooks06/0603001.txt",
+                             "https://gutenberg.net.au/ebooks06/0602141.txt",
+                             "https://gutenberg.net.au/ebooks06/0602151.txt",
+                             "https://gutenberg.net.au/ebooks06/0607201.txt",
+                             "https://gutenberg.net.au/ebooks/fr100215.txt",
+                             "https://gutenberg.net.au/ebooks02/0200681.txt",
+                             "https://gutenberg.net.au/ebooks02/0200691.txt",
+                             "https://gutenberg.net.au/ebooks02/0200701.txt",
+                             "https://gutenberg.net.au/ebooks07/0700761.txt",
+                             "https://gutenberg.net.au/ebooks02/0200711.txt",
+                             "https://gutenberg.net.au/ebooks/fr100092.txt",
+                             "https://gutenberg.net.au/ebooks10/1000601.txt",
+                             "https://gutenberg.net.au/ebooks10/1000631.txt",
+                             "https://gutenberg.net.au/ebooks13/1305101.txt",
+                             "https://gutenberg.net.au/ebooks10/1000371.txt",
+                             "https://gutenberg.net.au/ebooks10/1000361.txt",
+                             "https://gutenberg.net.au/ebooks06/0605241.txt",
+                             "https://gutenberg.net.au/ebooks08/0801051.txt",
+                             "https://gutenberg.net.au/ebooks06/0605251.txt",
+                             "https://gutenberg.net.au/ebooks02/0200411.txt",
+                             "https://gutenberg.net.au/ebooks03/0300871.txt",
+                             "https://gutenberg.net.au/ebooks/e00085.txt",
+                             "https://gutenberg.net.au/ebooks03/0300601.txt"] # Steen Steensen BLICHER (1782-1846)
+
+
+    download_url_list = download_url_list_b_1
+
+    for download_url in download_url_list:
+        download_gutenberg_australia_text(
+            download_url_=download_url,
+            output_dir_=folder_document_path
+        )
+

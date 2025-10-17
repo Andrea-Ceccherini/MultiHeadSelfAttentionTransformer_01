@@ -159,11 +159,15 @@ def load_text_data_from_folder(folder_path, data_list):
 if __name__ == "__main__":
 
     print("__main__() - BEGIN")
+
     begin_time = datetime.now()
-    # Sostituisci "gpt2" con il tokenizer che intendi usare
+
     books_text_data_folder = "../../../Datasets/Txt_Books/"
     wikipedia_text_data_folder = "../../../Datasets/WikipediaData/"
+    au_books_text_data_folder = "../../../Datasets/Au_Books/"
 
+
+    # Sostituisci "gpt2" con il tokenizer che intendi usare
     tokenizer, tokenizer_len = load_gpt2_tokenizer()
 
     # tokenizer = AutoTokenizer.from_pretrained("gpt2")
@@ -218,17 +222,21 @@ if __name__ == "__main__":
     # --- Prepare your raw text data from a folder ---
     raw_text_data = []  # Inizializza la lista VUOTA
 
-
-
-
-
-    # 1. Caricamento dei dati da 'books_text_data_folder'
+    # Loading data from 'num_books_docs' to 'raw_text_data'
     print(f"\n__main__() - Loading data from: {books_text_data_folder}")
     num_books_docs = load_text_data_from_folder(books_text_data_folder, raw_text_data)
 
-    # 2. Caricamento dei dati da 'wikipedia_text_data_folder'
+    # Loading data from 'wikipedia_text_data_folder' to 'raw_text_data'
     print(f"\n__main__() - Loading data from: {wikipedia_text_data_folder}")
     num_wiki_docs = load_text_data_from_folder(wikipedia_text_data_folder, raw_text_data)
+
+    # Loading data from 'au_books_text_data_folder' to 'raw_text_data'
+    print(f"\n__main__() - Loading data from: {au_books_text_data_folder}")
+    num_au_books_docs = load_text_data_from_folder(au_books_text_data_folder, raw_text_data)
+
+    print(f"\n__main__() - Number of documents loaded (Books): {num_books_docs}")
+    print(f"__main__() - Number of documents loaded (Wikipedia): {num_wiki_docs}")
+    print(f"__main__() - Number of documents loaded (Au Books): {num_au_books_docs}")
 
     # 3. Verifica e calcolo totale
     if not raw_text_data:
@@ -241,9 +249,8 @@ if __name__ == "__main__":
         # Split the text by whitespace and add the number of words
         total_words += len(text.split())
 
-    print(f"\n__main__() - Number of documents loaded (Books): {num_books_docs}")
-    print(f"__main__() - Number of documents loaded (Wikipedia): {num_wiki_docs}")
-    print(f"__main__() - Total number of documents loaded: {len(raw_text_data)}")
+
+    print(f"\n__main__() - Total number of documents loaded: {len(raw_text_data)}")
     print(f"__main__() - Total number of words loaded: {total_words}")
     # -------------------------------------------------------------
 

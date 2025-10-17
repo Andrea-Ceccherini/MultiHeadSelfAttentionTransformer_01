@@ -19,7 +19,7 @@ def download_gutenberg_australia_text(download_url_, output_dir_):
 
     # Create output directory if it does not exist
     os.makedirs(output_dir_, exist_ok=True)
-    output_path = os.path.join(output_dir_, txt_file_name_)
+    output_file_name_path = os.path.join(output_dir_, txt_file_name_)
 
     print(f"Attempting to download from: {download_url_}")
 
@@ -33,7 +33,7 @@ def download_gutenberg_australia_text(download_url_, output_dir_):
 
 
         # Saving text
-        with open(output_path, 'w', encoding='utf-8') as f:
+        with open(output_file_name_path, 'w', encoding='utf-8') as f:
             f.write(raw_text)
 
         print(f"✅ Success: '{txt_file_name_}' downloaded and saved in '{output_dir_}'.")
