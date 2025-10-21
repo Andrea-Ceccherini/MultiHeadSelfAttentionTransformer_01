@@ -31,9 +31,10 @@ git commit -m "Initial commit"      Creates a snapshot (commit) of the staged fi
 B. Link Local to GitHub Repository
 Now, connect your local repository to the empty one you created on GitHub.
 
-Command                             Purpose
-git remote add origin <REMOTE_URL>  Links your local repository to the GitHub one. Replace <REMOTE_URL> with the URL you copied from GitHub (e.g., https://github.com/user/repo-name.git). origin is the default name for the remote.
-git branch -M main                  Renames your current local branch to main. (In older Git versions, this might be master, the modern standard name is main).
+Command                                                                                                 Purpose
+git remote add origin https://github.com/Andrea-Ceccherini/MultiHeadSelfAttentionTransformer_01.git     Links your local repository to the GitHub one. Replace <REMOTE_URL> with the URL you copied from GitHub (e.g., https://github.com/Andrea-Ceccherini/MultiHeadSelfAttentionTransformer_01.git . origin is the default name for the remote.
+git branch -M main                                                                                      Renames your current local branch to main. (In older Git versions, this might be master, the modern standard name is main).
+
 
 C. Push Code
 Finally, push your local commits to the remote repository on GitHub.
