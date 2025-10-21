@@ -244,10 +244,48 @@ if __name__ == "__main__":
                              "https://gutenberg.net.au/ebooks02/0200411.txt",
                              "https://gutenberg.net.au/ebooks03/0300871.txt",
                              "https://gutenberg.net.au/ebooks/e00085.txt",
-                             "https://gutenberg.net.au/ebooks03/0300601.txt"] # Steen Steensen BLICHER (1782-1846)
+                             "https://gutenberg.net.au/ebooks03/0300601.txt"]   # Steen Steensen BLICHER (1782-1846)
+
+    download_url_list_b_2 = ["https://gutenberg.net.au/ebooks/e00085.txt",   # https://gutenberg.net.au/plusfifty-a-m.html#letterA
+                             "https://gutenberg.net.au/ebooks12/1203871.txt",
+                             "https://gutenberg.net.au/ebooks06/0605471.txt",
+                             "https://gutenberg.net.au/ebooks/e00008.txt",
+                             "https://gutenberg.net.au/ebooks06/0607091.txt",
+                             "https://gutenberg.net.au/ebooks06/0607131.txt",
+                             "https://gutenberg.net.au/ebooks06/0607291.txt",
+                             "https://gutenberg.net.au/ebooks03/0301371.txt",
+                             "https://gutenberg.net.au/ebooks06/0601591.txt",
+                             "https://gutenberg.net.au/ebooks06/0601621.txt",
+                             "https://gutenberg.net.au/ebooks06/0601611.txt",
+                             "https://gutenberg.net.au/ebooks06/0601601.txt",
+                             "https://gutenberg.net.au/ebooks06/0601581.txt",
+                             "https://gutenberg.net.au/ebooks06/0607051.txt",
+                             "https://gutenberg.net.au/ebooks06/0607111.txt",
+                             "https://gutenberg.net.au/ebooks09/0900411.txt",
+                             "https://gutenberg.net.au/ebooks09/0901021.txt",
+                             "https://gutenberg.net.au/ebooks09/0901041.txt",
+                             "https://gutenberg.net.au/ebooks09/0901051.txt",
+                             "https://gutenberg.net.au/ebooks09/0900421.txt",
+                             "https://gutenberg.net.au/ebooks08/0801141.txt",
+                             "https://gutenberg.net.au/ebooks09/0900531.txt",
+                             "https://gutenberg.net.au/ebooks09/0900501.txt",
+                             "https://gutenberg.net.au/ebooks08/0800641.txt",
+                             "https://gutenberg.net.au/ebooks06/0605181.txt",
+                             "https://gutenberg.net.au/ebooks09/0900571.txt",
+                             "https://gutenberg.net.au/ebooks09/0900581.txt",
+                             "https://gutenberg.net.au/ebooks09/0900561.txt",
+                             "https://gutenberg.net.au/ebooks13/1300701.txt",
+                             "https://gutenberg.net.au/ebooks09/0900791.txt",
+                             "https://gutenberg.net.au/ebooks09/0900801.txt",
+                             "https://gutenberg.net.au/ebooks02/0200901.txt",       # Ernest BRAMAH (1867-1942) Max Carrados Mysteries
+                             "",
+                             "",
+                             "",
+                             "",
+                             ""]
 
 
-    download_url_list = download_url_list_b_1
+    download_url_list = download_url_list_b_2
 
     for download_url in download_url_list:
         download_gutenberg_australia_text(
