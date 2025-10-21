@@ -278,6 +278,10 @@ def model_training(epochs, train_dataloader, val_dataloader, device, optimizer, 
 
     # Check requires_grad for a parameter (optional, for initial debugging confirmation)
     # print("model_training() - Linear1 weight requires_grad:", model.encoder_layers[0].feed_forward.linear1.weight.requires_grad)
+    print("model_training() - Epochs Training Phase - STARTED")
+
+    print("model_training() - Number of Epochs:", range(epochs))
+
 
     for epoch in range(epochs):
         # ---------------------
@@ -286,8 +290,6 @@ def model_training(epochs, train_dataloader, val_dataloader, device, optimizer, 
         model.train()  # Ensure model is in training mode
         train_total_loss = 0
         for batch in train_dataloader:
-            # global intermediate_gradients # Uncomment if still using hooks
-            # intermediate_gradients = [] # Uncomment if still using hooks
 
             src_data = batch['input_ids'].to(device)
             trg_data = batch['labels'].to(device)
@@ -352,6 +354,8 @@ def model_training(epochs, train_dataloader, val_dataloader, device, optimizer, 
             if epochs_no_improve >= patience:
                 print(f"model_training() - Early stopping triggered after {patience} epochs without improvement.")
                 break  # Exit the training loop
+
+    print("model_training() - Epochs Training Phase - COMPLETED")
 
     print("model_training() - END")
 
@@ -461,6 +465,9 @@ def create_model_configuration(model_save_dir_, input_vocab_size_, target_vocab_
 def tokenize_dataset(tokenizer_, questions_, answers_, max_length_):
     print("tokenize_dataset() - BEGIN")
 
+    print("tokenize_dataset() - max_length_ =", max_length_)
+
+
     # Ottieni i token BOS ed EOS. Spesso sono lo stesso ID per GPT-2.
     bos_token = tokenizer_.bos_token if tokenizer_.bos_token else tokenizer_.eos_token
     eos_token = tokenizer_.eos_token
@@ -509,20 +516,52 @@ def tokenize_dataset(tokenizer_, questions_, answers_, max_length_):
     return tokenized_data
 
 
-def get_dataloaders(dataset_file_path_, tokenizer_, batch_size_, test_size=0.1, val_size=0.1):
+
+
+def get_dataloaders(liver_data_path, dict_data_path, tokenizer_, batch_size_, test_size=0.1, val_size=0.1):
     """
-    Creates DataLoaders for training, validation, and test sets.
+    Creates DataLoaders for training, validation, and test sets by combining
+    the Liver QA dataset and the English Dictionary dataset.
     """
     print("get_dataloaders() - BEGIN")
-    df = read_csv_line_by_line(dataset_file_path_)
-    df = df.dropna(subset=['question', 'answer'])
-    print(f"get_dataloaders() - Initial DataFrame shape: {df.shape}")
+
+    # 1. Load Liver Data
+    # Assuming read_csv_line_by_line is a function that returns a pandas DataFrame
+    liver_df = read_csv_line_by_line(liver_data_path)
+    liver_df = liver_df.dropna(subset=['question', 'answer'])
+    print(f"get_dataloaders() - Liver DataFrame shape: {liver_df.shape}")
+
+    # 2. Load Dictionary Data
+    try:
+        # Use a standard pandas read_csv for the dictionary file
+        # Columns are 'word' and 'definition'
+        dict_df = pd.read_csv(dict_data_path)
+
+        # Rename columns to match the expected format for your pipeline ('question', 'answer')
+        dict_df = dict_df.rename(columns={'word': 'question', 'definition': 'answer'})
+        dict_df = dict_df.dropna(subset=['question', 'answer'])
+        print(f"get_dataloaders() - Dictionary DataFrame shape: {dict_df.shape}")
+    except FileNotFoundError:
+        print(f"get_dataloaders() - Warning: Dictionary file not found at {dict_data_path}. Skipping.")
+        dict_df = pd.DataFrame(columns=['question', 'answer'])  # Create empty dataframe
+    except Exception as e:
+        print(f"get_dataloaders() - Error loading dictionary data: {e}. Skipping.")
+        dict_df = pd.DataFrame(columns=['question', 'answer'])
+
+    # 3. Combine DataFrames
+    # Concatenate the two DataFrames
+    df = pd.concat([liver_df, dict_df], ignore_index=True)
+    # Remove any duplicates that might have been created or existed
+    df = df.drop_duplicates(subset=['question', 'answer']).reset_index(drop=True)
+
+    print(f"get_dataloaders() - Combined and cleaned DataFrame shape: {df.shape}")
+
+    # 4. Splitting the Unified Dataset
 
     # Split into train + validation and test sets
     train_val_df, test_df = train_test_split(df, test_size=test_size, random_state=42)
 
     # Split train + validation into train and validation sets
-    # Adjust val_size relative to the remaining data
     val_size_adjusted = val_size / (1 - test_size)
     train_df, val_df = train_test_split(train_val_df, test_size=val_size_adjusted, random_state=42)
 
@@ -530,31 +569,31 @@ def get_dataloaders(dataset_file_path_, tokenizer_, batch_size_, test_size=0.1, 
     print(f"get_dataloaders() - Validation shape: {val_df.shape}")
     print(f"get_dataloaders() - Test shape: {test_df.shape}")
 
-    # Process each split
+    # Process each split (the rest of the function remains the same)
     train_questions, train_answers = train_df['question'].tolist(), train_df['answer'].tolist()
     val_questions, val_answers = val_df['question'].tolist(), val_df['answer'].tolist()
     test_questions, test_answers = test_df['question'].tolist(), test_df['answer'].tolist()
 
     # Tokenize datasets
-    train_tokenized_data = tokenize_dataset(tokenizer_, train_questions, train_answers, max_length_=TOKENIZATION_MAX_LENGTH)
+    train_tokenized_data = tokenize_dataset(tokenizer_, train_questions, train_answers,
+                                            max_length_=TOKENIZATION_MAX_LENGTH)
     val_tokenized_data = tokenize_dataset(tokenizer_, val_questions, val_answers, max_length_=TOKENIZATION_MAX_LENGTH)
-    test_tokenized_data = tokenize_dataset(tokenizer_, test_questions, test_answers,max_length_=TOKENIZATION_MAX_LENGTH)  # Optional: for later evaluation
+    test_tokenized_data = tokenize_dataset(tokenizer_, test_questions, test_answers,
+                                           max_length_=TOKENIZATION_MAX_LENGTH)
 
     # Create Dataset objects
     train_dataset = LiverQADataset(train_tokenized_data)
     val_dataset = LiverQADataset(val_tokenized_data)
-    test_dataset = LiverQADataset(test_tokenized_data)  # Optional
+    test_dataset = LiverQADataset(test_tokenized_data)
 
-    # Create DataLoaders (no DataCollatorForSeq2Seq for custom model)
+    # Create DataLoaders
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size_, shuffle=True)
-    val_dataloader = DataLoader(val_dataset, batch_size=batch_size_, shuffle=False)  # No need to shuffle validation
-    test_dataloader = DataLoader(test_dataset, batch_size=batch_size_, shuffle=False)  # No need to shuffle test
+    val_dataloader = DataLoader(val_dataset, batch_size=batch_size_, shuffle=False)
+    test_dataloader = DataLoader(test_dataset, batch_size=batch_size_, shuffle=False)
 
     print("get_dataloaders() - END")
 
     return train_dataloader, val_dataloader, test_dataloader
-
-
 
 
 def apply_repetition_penalty(next_token_logits, sequence, penalty_factor=1.2):

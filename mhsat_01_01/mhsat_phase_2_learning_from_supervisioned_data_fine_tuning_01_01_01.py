@@ -21,16 +21,25 @@ def calculate_elapsed_time(begin_time_, end_time_):
     formatted_elapsed_time_ = f"{years:04}:{months:02}:{days:02}:{hours:02}:{minutes:02}:{seconds:02}:{milliseconds:03}"
     return formatted_elapsed_time_
 
+
 if __name__ == "__main__":
     print("__main__() - BEGIN")
     begin_time = datetime.now()
 
-    # Paths and Hyperparameters
-    #dataset_file_path = "../../../Datasets/LiverDataset/liver_questions_and_answers_14931.csv"
-    dataset_file_path = "../../../Datasets/LiverDataset/liver_questions_and_answers_999.csv"
+    print("__main__() - begin_time = ", begin_time)
 
-    if not os.path.exists(dataset_file_path):
-        print(f"__main__() - Error: The file '{dataset_file_path}' was not found.")
+
+    # Paths and Hyperparameters
+    # liver_dataset_path = "../../../Datasets/LiverDataset/liver_questions_and_answers_14931.csv"
+    liver_dataset_path = "../../../Datasets/LiverDataset/liver_questions_and_answers_999.csv"
+    dictionary_file_path = "../../../Datasets/English_Dictionary/english_dictionary_44.csv"  # The new path
+
+    if not os.path.exists(liver_dataset_path):
+        print(f"__main__() - Error: The file '{liver_dataset_path}' was not found.")
+        exit()
+
+    if not os.path.exists(dictionary_file_path):
+        print(f"__main__() - Error: The file '{dictionary_file_path}' was not found.")
         exit()
 
     model_save_dir = "supervised_qa_model_files"
@@ -41,12 +50,6 @@ if __name__ == "__main__":
     tokenizer, tokenizer_len = load_gpt2_tokenizer()
     #tokenizer_len = len(tokenizer)
     print(f"__main__() - tokenizer_len = {tokenizer_len}")
-
-
-    # tokenizer = AutoTokenizer.from_pretrained("gpt2")
-    # # FIX: Add the same special token to match the pre-trained model's vocabulary.
-    # if tokenizer.pad_token is None:
-    #     tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 
     # Define hyperparameters to match the pre-trained model
     d_model = D_MODEL
@@ -67,7 +70,7 @@ if __name__ == "__main__":
     print(f"__main__() - input_vocab_size: {input_vocab_size}")
     print(f"__main__() - target_vocab_size: {target_vocab_size}")
 
-    # Istanzia il modello
+    # Instantiate the model
     model = CustomTransformer(
         input_vocab_size=input_vocab_size,
         target_vocab_size=target_vocab_size,
@@ -104,8 +107,12 @@ if __name__ == "__main__":
 
 
     # Prepare data
-    train_dataloader, val_dataloader, test_dataloader = get_dataloaders(dataset_file_path, tokenizer, batch_size)
-
+    train_dataloader, val_dataloader, test_dataloader = get_dataloaders(
+        liver_dataset_path,  # Original liver data path
+        dictionary_file_path,  # New dictionary data path
+        tokenizer,
+        batch_size
+    )
     # Define optimizer and loss function
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)

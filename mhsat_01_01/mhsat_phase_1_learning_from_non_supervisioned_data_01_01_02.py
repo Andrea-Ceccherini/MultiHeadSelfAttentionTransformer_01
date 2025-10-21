@@ -162,6 +162,9 @@ if __name__ == "__main__":
 
     begin_time = datetime.now()
 
+    print("__main__() - begin_time = ", begin_time)
+
+
     books_text_data_folder = "../../../Datasets/Txt_Books/"
     wikipedia_text_data_folder = "../../../Datasets/WikipediaData/"
     au_books_text_data_folder = "../../../Datasets/Au_Books/"
