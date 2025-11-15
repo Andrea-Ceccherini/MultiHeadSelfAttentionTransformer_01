@@ -1,67 +1,109 @@
 import wikipedia
 import os
 from datetime import datetime
-
+import re
 
 
 def calculate_elapsed_time(begin_time_, end_time_):
     elapsed_time_ = end_time_ - begin_time_
-    days = elapsed_time_.days
-    seconds = elapsed_time_.seconds
-    milliseconds = elapsed_time_.microseconds // 1000
-    hours, remainder = divmod(seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    years, days = divmod(days, 365)
-    months, days = divmod(days, 30)
-    formatted_elapsed_time_ = f"{years:04}:{months:02}:{days:02}:{hours:02}:{minutes:02}:{seconds:02}:{milliseconds:03}"
+    days_ = elapsed_time_.days
+    seconds_ = elapsed_time_.seconds
+    milliseconds_ = elapsed_time_.microseconds // 1000
+    hours_, remainder_ = divmod(seconds_, 3600)
+    minutes_, seconds_ = divmod(remainder_, 60)
+    years_, days_ = divmod(days_, 365)
+    months_, days_ = divmod(days_, 30)
+    formatted_elapsed_time_ = f"{years_:04}:{months_:02}:{days_:02}:{hours_:02}:{minutes_:02}:{seconds_:02}:{milliseconds_:03}"
     return formatted_elapsed_time_
 
 
-def collect_and_save_articles_wikipedia(subjects_to_find_, destination_folder_="dati_wikipedia"):
+def content_cleanup(content_):
     """
-    Search and download Wikipedia articles by topic,
-    saving them in separate text files.
+    Removes non-informative final sections (references, external links) that could detract from the LLM curriculum.
+    """
+    # 1. Remove unwanted sections by finding their title (level 2 or 3)
+    unwanted_sections = [
+        "See also",
+        "References",
+        "External links",
+        "Further reading",
+        "Bibliography",
+        "Footnotes"
+    ]
 
-    Args:
-        subjects_to_find_ (list): List of strings containing the names of the arguments to search for.
-        destination_folder_ (str): The name of the folder where to save the files.
+    # Create a regex pattern to find the beginning of these sections
+    # Section titles are assumed to be followed by at least two newlines.
+    # and that they are at the beginning of the line.
+    pattern = r'\n\n(' + '|'.join(re.escape(s) for s in unwanted_sections) + r')\n'
+
+    match = re.search(pattern, content_)
+
+    if match:
+        # If it finds an unwanted section, it truncates the content at that point
+        content_ = content_[:match.start()]
+
+    # 2. Removes any multiple consecutive newlines leaving a maximum of two
+    content_ = re.sub(r'\n{3,}', '\n\n', content_)
+
+    return content_.strip()
+
+
+def collect_and_save_articles_wikipedia(subjects_to_find_, destination_folder_="dati_wikipedia", lang_="en"):
+    """
+    Search and download Wikipedia articles by topic, using pre-emptive search and cleaning the content.
     """
     print("collect_and_save_articles_wikipedia() - BEGIN")
-    # 1. Configurazione Iniziale
-    print(f"Tentativo di creare la cartella: {destination_folder_}")
+
+    # 1. Initial Setup
+    print(f"Attempting to create folder: {destination_folder_}")
     os.makedirs(destination_folder_, exist_ok=True)
-    wikipedia.set_lang("en")  # Imposta la lingua di Wikipedia (italiano)
+
+    wikipedia.set_lang(lang_)
+    print(f"Language set to: '{lang_}'")
 
     downloaded_articles_ = 0
 
     for subject_ in subjects_to_find_:
-        print(f"\n--- Elaborazione di: '{subject_}' ---")
+        print(f"\n--- Processing of: '{subject_}' ---")
 
         try:
-            # 2. Ottenere la Pagina (Potrebbe sollevare un'eccezione se non trovata)
-            page_ = wikipedia.page(subject_, auto_suggest=False)
+            # 2. Search to find the most likely match (results = 1)
+            search_results = wikipedia.search(subject_, results=1)
 
-            # 3. Pulizia del Nome del File
-            # Rimuove caratteri non validi per i nomi di file
-            file_name_ = "".join(c for c in subject_ if c.isalnum() or c in (' ', '_')).rstrip().replace(' ', '_')
+            if not search_results:
+                print(f"❌ Error: No search results found for '{subject_}'. Skipped.")
+                continue
+
+            page_title = search_results[0]
+
+            # 3. Get Page (Using Found Title + Timeout)
+            page_ = wikipedia.page(title=page_title, auto_suggest=False, redirect=True)
+
+            # 4. File Name Cleanup
+            file_name_ = "".join(c for c in page_title if c.isalnum() or c in (' ', '_')).rstrip().replace(' ', '_')
             file_path_ = os.path.join(destination_folder_, f"{file_name_}.txt")
 
-            # 4. Salvare il Contenuto nel File
-            with open(file_path_, 'w', encoding='utf-8') as f:
-                # La proprietà 'content' restituisce l'intero testo della page_
-                f.write(page_.content)
+            # 5. Cleaning and Preparing Contents
+            cleaned_content = content_cleanup(page_.content)
 
-            print(f"✔ Articolo salvato in: {file_path_}")
+            # 6. Save Clean Content to File
+            with open(file_path_, 'w', encoding='utf-8') as f:
+                f.write(cleaned_content)
+
+            print(f"✔ Article saved: '{page_title}' in {file_path_}")
             downloaded_articles_ += 1
 
         except wikipedia.exceptions.PageError:
-            print(f"❌ Errore: Pagina di Wikipedia non trovata per l'subject_ '{subject_}'. Saltato.")
+            print(f"❌ Error: Page not found for your search '{subject_}'. Skipped.")
         except wikipedia.exceptions.DisambiguationError as e:
-            print(f"⚠️ Attenzione: L'subject_ '{subject_}' è ambiguo. Opzioni: {e.options[:5]}. Saltato.")
+            # Captures rare disambiguation not resolved by the initial search
+            print(f"⚠️ Attention: The term '{subject_}' It's ambiguous. Options: {e.options[:3]}. Skipped.")
+        except wikipedia.exceptions.HTTPTimeoutError:
+            print(f"❌ Error: Timeout della rete durante il download di '{subject_}'. Skipped.")
         except Exception as e:
-            print(f"collect_and_save_articles_wikipedia() - Generic error while processing '{subject_}': {e}. Saltato.")
+            print(f"collect_and_save_articles_wikipedia() - Generic error ('{subject_}'): {e}. Skipped.")
 
-    print(f"\n--- Finito. {downloaded_articles_} articoli salvati. ---")
+    print(f"\n--- Finished. {downloaded_articles_} saved articles. ---")
     print("collect_and_save_articles_wikipedia() - END")
 
 
@@ -1171,12 +1213,17 @@ if __name__ == "__main__":
                           "Women's erotica",
                           "Human sexual activity"]
 
+    subjects_to_find_5 = ["Human sexuality",
+                          "Biology"                          ]
+
+
     destination_folder = "../../../Datasets/WikipediaData/"
-    subjects_to_find = subjects_to_find_4
+    subjects_to_find = subjects_to_find_5
 
+    # It combines all the lists into one large corpus
+    all_subjects_to_find = subjects_to_find_1 + subjects_to_find_2 + subjects_to_find_3 + subjects_to_find_4
 
-
-    collect_and_save_articles_wikipedia(subjects_to_find, destination_folder)
+    collect_and_save_articles_wikipedia(subjects_to_find_=subjects_to_find, destination_folder_=destination_folder, lang_="en")
 
     end_time = datetime.now()
     elapsed_time = calculate_elapsed_time(begin_time, end_time)
