@@ -127,7 +127,7 @@ def model_training_unsupervised(epochs, dataloader, device, optimizer, criterion
 if __name__ == "__main__":
     print("__main__() - BEGIN")
     # Sostituisci "gpt2" con il tokenizer che intendi usare
-    books_text_data_folder = "../../../Datasets/Books/"
+    books_text_data_folder = "../../../Datasets/Au_Books/"
     wikipedia_text_data_folder = "../../../Datasets/WikipediaData/"
 
 
