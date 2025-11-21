@@ -22,22 +22,22 @@ class UnsupervisedTextDataset(Dataset):
 def calculate_elapsed_time(start, end):
     return str(end - start)
 
-def model_training_unsupervised(epochs, dataloader, device, optimizer, criterion, model, model_save_dir, patience=3):
+def model_training_unsupervised(epochs, dataloader_, device_, optimizer_, criterion_, model_, model_save_dir_, patience_=3):
     print("Unsupervised Training - BEGIN")
-    model.to(device)
-    model.train()
+    model_.to(device_)
+    model_.train()
 
     best_val_loss = float('inf')
     epochs_no_improve = 0
 
     for epoch in range(epochs):
         train_loss = 0
-        model.train()
+        model_.train()
         
         print(f"Epoch {epoch+1}/{epochs} ", end="")
         
-        for i, batch in enumerate(dataloader):
-            src_data = batch['input_ids'].to(device)
+        for i, batch in enumerate(dataloader_):
+            src_data = batch['input_ids'].to(device_)
             
             # Logic: Predict next token.
             # Encoder Input: Full sequence
@@ -47,29 +47,29 @@ def model_training_unsupervised(epochs, dataloader, device, optimizer, criterion
             decoder_input = src_data[:, :-1]
             labels = src_data[:, 1:]
             
-            optimizer.zero_grad()
-            output = model(src_data, decoder_input)
+            optimizer_.zero_grad()
+            output = model_(src_data, decoder_input)
             
-            loss = criterion(output.reshape(-1, output.shape[-1]), labels.reshape(-1))
+            loss = criterion_(output.reshape(-1, output.shape[-1]), labels.reshape(-1))
             loss.backward()
-            optimizer.step()
+            optimizer_.step()
             
             train_loss += loss.item()
             if i % 50 == 0: print(".", end="", flush=True)
 
-        avg_loss = train_loss / len(dataloader)
+        avg_loss = train_loss / len(dataloader_)
         print(f" Loss: {avg_loss:.4f}")
 
         # Simulating validation on the same set for simplicity (In real scenarios, split the data)
         if avg_loss < best_val_loss:
             best_val_loss = avg_loss
             epochs_no_improve = 0
-            os.makedirs(model_save_dir, exist_ok=True)
-            save_file(model.state_dict(), os.path.join(model_save_dir, "unsupervised_model_best.safetensors"))
+            os.makedirs(model_save_dir_, exist_ok=True)
+            save_file(model_.state_dict(), os.path.join(model_save_dir_, "unsupervised_model_best.safetensors"))
             print("Saved Best Model.")
         else:
             epochs_no_improve += 1
-            if epochs_no_improve >= patience:
+            if epochs_no_improve >= patience_:
                 print("Early Stopping.")
                 break
 
@@ -141,3 +141,5 @@ if __name__ == "__main__":
     model_training_unsupervised(5, dataloader, device, optimizer, criterion, model, "unsupervised_model_weights")
 
     print(f"Elapsed: {calculate_elapsed_time(begin_time, datetime.now())}")
+
+    print("MAIN - END")

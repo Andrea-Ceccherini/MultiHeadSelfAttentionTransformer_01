@@ -59,11 +59,29 @@ if __name__ == "__main__":
         user_input = input("\nQuestion (type 'exit' to quit): ")
         if user_input.lower() in ['exit', 'quit']:
             break
-            
-        answer = generate_text_with_beam(
-            model, tokenizer, user_input, 
-            max_output_length=50, beam_width=5, temperature=0.7
+        
+        # --- MODIFICA FONDAMENTALE: FORMATTAZIONE DEL PROMPT ---
+        # Il modello è stato addestrato su "Question: ... \nAnswer: ..."
+        # Dobbiamo imitare questo formato per attivare la risposta corretta.
+        formatted_prompt = f"Question: {user_input}\nAnswer:"
+        
+        # Parametri suggeriti:
+        # temperature=0.7 -> Buon bilanciamento tra creatività e precisione
+        # beam_width=3 o 5 -> Più alto è, più accurato (ma lento)
+        full_response = generate_text_with_beam(
+            model, tokenizer, formatted_prompt, 
+            max_output_length=100, beam_width=5, temperature=0.7
         )
-        print(f"Answer: {answer}")
+        
+        # --- PULIZIA DELL'OUTPUT ---
+        # La funzione restituisce tutto il testo (Prompt + Risposta).
+        # Per pulizia, mostriamo solo la parte dopo "Answer:"
+        if "Answer:" in full_response:
+            clean_answer = full_response.split("Answer:")[-1].strip()
+        else:
+            # Caso raro in cui il modello non segue il formato, mostriamo tutto ma rimuoviamo la domanda
+            clean_answer = full_response.replace(formatted_prompt, "").strip()
+            
+        print(f"Answer: {clean_answer}")
 
     print("END")

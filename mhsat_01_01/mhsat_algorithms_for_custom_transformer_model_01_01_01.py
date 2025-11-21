@@ -1,6 +1,6 @@
 """
 MultiHeadAttention, FeedForward, TransformerBlock, PositionalEncoding, and CustomTransformer classes.
-Improved implementation with Causal Masking and Memory Leak fixes.
+Improved implementation with Causal Masking, Memory Leak fixes, and Data Mixing (Replay Buffer) support.
 """
 
 import json
@@ -15,6 +15,8 @@ from sklearn.model_selection import train_test_split
 import warnings
 from torch.utils.data import DataLoader, Dataset
 import os
+import glob
+import random
 
 # ------- Global Parameters -------
 TOKENIZATION_MAX_LENGTH = 128
@@ -30,7 +32,8 @@ class LiverQADataset(Dataset):
         self.encodings = encodings
 
     def __getitem__(self, idx):
-        item = {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
+        # FIX: Use clone().detach() to avoid UserWarning about creating tensor from tensor
+        item = {key: val[idx].clone().detach() for key, val in self.encodings.items()}
         return item
 
     def __len__(self):
@@ -166,9 +169,6 @@ class CustomTransformer(nn.Module):
         # --- Encoder ---
         src = self.encoder_embedding(src)
         src = self.positional_encoding(src)
-
-        # Create padding mask for Encoder if not provided (assuming padding token ID is 50257 or similar if passed)
-        # For now, we rely on src_mask being passed if needed, or None.
         
         for layer in self.encoder_layers:
             src = layer(src, self_attn_mask=src_mask)
@@ -179,11 +179,10 @@ class CustomTransformer(nn.Module):
         trg = self.decoder_embedding(trg)
         trg = self.positional_encoding(trg)
 
-        # FIX: Generate Causal Mask for Decoder
+        # Generate Causal Mask for Decoder
         trg_seq_len = trg.size(1)
         causal_mask = generate_square_subsequent_mask(trg_seq_len, trg.device)
         
-        # Combine with padding mask if trg_mask is provided (optional logic)
         if trg_mask is not None:
             causal_mask = causal_mask + trg_mask
 
@@ -226,7 +225,6 @@ def model_training(epochs, train_dataloader, val_dataloader, device, optimizer, 
         model.train()
         train_total_loss = 0
         
-        # Progress bar simulation
         print(f"\nEpoch {epoch+1}/{epochs} [Training]", end="")
         
         for i, batch in enumerate(train_dataloader):
@@ -238,7 +236,6 @@ def model_training(epochs, train_dataloader, val_dataloader, device, optimizer, 
 
             optimizer.zero_grad()
             
-            # Ensure sequence lengths match if truncation happened differently
             min_len = min(decoder_input.size(1), labels.size(1))
             decoder_input = decoder_input[:, :min_len]
             labels = labels[:, :min_len]
@@ -306,6 +303,64 @@ def read_csv_line_by_line(dataset_file_path):
         print(f"Error reading CSV: {e}")
         return None
 
+
+def load_general_knowledge_as_qa(path_pattern, num_samples=300, max_chars=1000):
+    """
+    Loads general text files and formats them strictly as Question/Answer pairs
+    to match the liver dataset format.
+    """
+    print(f"Loading General Knowledge data from: {path_pattern}")
+    files = glob.glob(path_pattern)
+
+    if not files:
+        print("No general knowledge files found. Skipping mixing.")
+        return pd.DataFrame(columns=['question', 'answer'])
+
+    selected_files = random.sample(files, min(num_samples, len(files)))
+    print(f"Selected {len(selected_files)} general files for replay buffer.")
+
+    questions = []
+    answers = []
+
+    for file_path in selected_files:
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                text = f.read()
+
+                # --- DATA CLEANING ---
+                # Remove common Gutenberg/Wiki headers to avoid "Australia eBooks"
+                lines = text.split('\n')
+                # We only keep lines that look like real sentences (length > 20, no '==')
+                clean_lines = [line for line in lines if len(line) > 20 and "==" not in line and "eBook" not in line]
+                text = " ".join(clean_lines)
+
+                if len(text) < 100:
+                    continue
+
+                # Let's take a block of text
+                text = text[:max_chars]
+
+                # --- FORMATTING TRICK ---
+                # Instead of brutally cutting it in half, let's create a fake question.
+                # We use the first 50 characters as context.
+                split_idx = 100  # We use the first 100 characters as a "prompt"
+
+                context_preview = text[:split_idx]
+                rest_of_text = text[split_idx:]
+
+                # Let's create a question that the model can understand
+                # We insert the prefix we use in the liver dataset
+                fake_question = f"Complete the following text: {context_preview}..."
+
+                questions.append(fake_question)
+                answers.append(rest_of_text)
+
+        except Exception as e:
+            print(f"Error reading {file_path}: {e}")
+
+    return pd.DataFrame({'question': questions, 'answer': answers})
+
+
 def save_model_weights(model, save_directory):
     os.makedirs(save_directory, exist_ok=True)
     path = os.path.join(save_directory, "model.safetensors")
@@ -344,13 +399,15 @@ def tokenize_dataset(tokenizer, questions, answers, max_length):
         'labels': decoder_tokenized['input_ids']
     }
 
-def get_dataloaders(liver_data_path, dict_data_path, tokenizer, batch_size, test_size=0.1, val_size=0.1):
+def get_dataloaders(liver_data_path, dict_data_path, general_data_path, tokenizer, batch_size, test_size=0.1, val_size=0.1):
+    # 1. Load Liver Data (Domain Specific)
     liver_df = read_csv_line_by_line(liver_data_path)
     if liver_df is not None:
         liver_df = liver_df.dropna(subset=['question', 'answer'])
     else:
         liver_df = pd.DataFrame(columns=['question', 'answer'])
 
+    # 2. Load Dictionary Data (Optional Domain Support)
     try:
         dict_df = pd.read_csv(dict_data_path)
         dict_df = dict_df.rename(columns={'word': 'question', 'definition': 'answer'})
@@ -359,16 +416,28 @@ def get_dataloaders(liver_data_path, dict_data_path, tokenizer, batch_size, test
         print(f"Dictionary error or not found: {e}")
         dict_df = pd.DataFrame(columns=['question', 'answer'])
 
-    df = pd.concat([liver_df, dict_df], ignore_index=True).drop_duplicates().reset_index(drop=True)
+    # 3. Load General Knowledge Data (Replay Buffer for Catastrophic Forgetting)
+    # We load approx 30% of general data relative to specific data size to keep a balance
+    general_df = load_general_knowledge_as_qa(general_data_path, num_samples=300)
+
+    # 4. Combine All
+    df = pd.concat([liver_df, dict_df, general_df], ignore_index=True).drop_duplicates().reset_index(drop=True)
+    
+    print(f"--- Data Composition ---")
+    print(f"Liver Data: {len(liver_df)}")
+    print(f"Dictionary Data: {len(dict_df)}")
+    print(f"General Knowledge (Replay): {len(general_df)}")
     print(f"Total Data Rows: {len(df)}")
+    print(f"------------------------")
 
     train_val, test = train_test_split(df, test_size=test_size, random_state=42)
     train, val = train_test_split(train_val, test_size=val_size/(1-test_size), random_state=42)
 
     def create_dl(split_df, shuffle):
-        data = tokenize_dataset(tokenizer, split_df['question'].tolist(), split_df['answer'].tolist(), TOKENIZATION_MAX_LENGTH)
+        # Ensure data is string type before tokenization
+        data = tokenize_dataset(tokenizer, split_df['question'].astype(str).tolist(), split_df['answer'].astype(str).tolist(), TOKENIZATION_MAX_LENGTH)
         ds = LiverQADataset(data)
-        return DataLoader(ds, batch_size=batch_size, shuffle=shuffle, num_workers=2, pin_memory=True)
+        return DataLoader(ds, batch_size=batch_size, shuffle=shuffle, num_workers=0, pin_memory=True) 
 
     return create_dl(train, True), create_dl(val, False), create_dl(test, False)
 
