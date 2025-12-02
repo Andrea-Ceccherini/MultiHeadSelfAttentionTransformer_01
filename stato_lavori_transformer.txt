@@ -1,9 +1,12 @@
-"Sto lavorando a un progetto Transformer from scratch in PyTorch.
-Siamo alla Phase 2 (Fine-Tuning).
-Situazione attuale:
-Abbiamo completato la Phase 1 (Pre-training non supervisionato) con successo.
-Abbiamo riscontrato problemi di Catastrophic Forgetting durante il Fine-Tuning sui dati medici (il modello dimenticava cos'era un gatto).
-Abbiamo implementato una strategia di Data Mixing (Replay Buffer) modificando il Dataset loader per mischiare dati medici (Question/Answer) con dati generici di Wikipedia.
-L'ultimo problema riscontrato era il Format Mismatch: il modello associava la parola 'Question:' solo al fegato.
-Ultima modifica: Abbiamo riscritto la funzione load_general_knowledge_as_qa per formattare anche i dati di Wikipedia come finte domande ('Complete the following text...'), per uniformare il training.
-Ora devo rilanciare il training della Phase 2 con questa modifica."
+"I'm working on a Transformer from scratch project in PyTorch.
+We're in Phase 2 (Fine-Tuning).
+Current status:
+We've successfully completed Phase 1 (Unsupervised Pre-training).
+We encountered Catastrophic Forgetting issues during fine-tuning on the medical data (the model forgot
+what a cat was).
+We implemented a Data Mixing strategy (Replay Buffer) by modifying the Dataset loader to mix medical
+data (Question/Answer) with generic Wikipedia data.
+The last issue encountered was Format Mismatch: the model associated the word 'Question:' only with the liver.
+Last edit: We rewrote the load_general_knowledge_as_qa function to also format the Wikipedia data
+as mock questions ('Complete the following text...'), to standardize the training.
+Now I need to rerun Phase 2 training with this change.

@@ -1,8 +1,3 @@
-"""
-MultiHeadAttention, FeedForward, TransformerBlock, PositionalEncoding, and CustomTransformer classes.
-Improved implementation with Causal Masking, Memory Leak fixes, and Data Mixing (Replay Buffer) support.
-"""
-
 import json
 import numpy as np
 import pandas as pd
@@ -32,7 +27,6 @@ class LiverQADataset(Dataset):
         self.encodings = encodings
 
     def __getitem__(self, idx):
-        # FIX: Use clone().detach() to avoid UserWarning about creating tensor from tensor
         item = {key: val[idx].clone().detach() for key, val in self.encodings.items()}
         return item
 
@@ -49,18 +43,18 @@ class FeedForward(nn.Module):
     def forward(self, x):
         return self.linear2(self.relu(self.linear1(x)))
 
+
+# --- REPLACE THIS FUNCTION ---
 def scaled_dot_product_attention(query, key, value, mask=None):
-    """
-    Calculates attention scores.
-    Mask handling: Expects an additive mask where '0' indicates keep and '-inf' indicates mask.
-    """
     d_k = query.size(-1)
-    scores = torch.matmul(query, key.transpose(-2, -1)) / torch.sqrt(torch.tensor(d_k, dtype=torch.float32).to(query.device))
-    
+    # FIX: Ensure the scaling factor matches the query's data type (FP16 or FP32)
+    scale = torch.sqrt(torch.tensor(d_k, device=query.device, dtype=query.dtype))
+
+    scores = torch.matmul(query, key.transpose(-2, -1)) / scale
+
     if mask is not None:
-        # Add mask to scores (0 + x = x; -inf + x = -inf)
         scores = scores + mask
-        
+
     attention_weights = F.softmax(scores, dim=-1)
     output = torch.matmul(attention_weights, value)
     return output, attention_weights
@@ -88,9 +82,8 @@ class MultiHeadAttention(nn.Module):
         key = split_heads(self.key(key))
         value = split_heads(self.value(value))
 
-        # Mask broadcasting allows (Batch, 1, 1, Seq) or (Batch, 1, Seq, Seq)
         attention_output, _ = scaled_dot_product_attention(query, key, value, mask)
-        
+
         attention_output = attention_output.transpose(1, 2).contiguous().view(batch_size, -1, self.d_model)
         return self.out(attention_output)
 
@@ -113,16 +106,13 @@ class TransformerBlock(nn.Module):
         self.dropout3 = nn.Dropout(dropout)
 
     def forward(self, x, encoder_output=None, self_attn_mask=None, cross_attn_mask=None):
-        # 1. Self-Attention
         attn_output = self.dropout1(self.self_attention(x, x, x, self_attn_mask))
         x = self.norm1(x + attn_output)
 
-        # 2. Cross-Attention (Decoder only)
         if self.is_decoder_block and encoder_output is not None:
             cross_attn_output = self.dropout2(self.cross_attention(x, encoder_output, encoder_output, cross_attn_mask))
             x = self.norm2(x + cross_attn_output)
 
-        # 3. Feed-Forward
         ff_output = self.dropout3(self.feed_forward(x))
         x = self.norm3(x + ff_output)
         return x
@@ -140,14 +130,15 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        # Handle cases where x is longer than max_len (clip if necessary)
         seq_len = x.size(1)
         return x + self.pe[:, :seq_len].to(x.device)
 
-def generate_square_subsequent_mask(sz, device):
-    """Generates a causal mask (upper triangular -inf)."""
+# --- REPLACE THIS FUNCTION ---
+def generate_square_subsequent_mask(sz, device, dtype=torch.float32):
+    """Generates a causal mask (upper triangular -inf) with specific dtype."""
     mask = (torch.triu(torch.ones((sz, sz), device=device)) == 1).transpose(0, 1)
-    mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+    # Convert to the correct dtype (FP16 or FP32) BEFORE filling
+    mask = mask.to(dtype).masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
     return mask
 
 class CustomTransformer(nn.Module):
@@ -169,10 +160,10 @@ class CustomTransformer(nn.Module):
         # --- Encoder ---
         src = self.encoder_embedding(src)
         src = self.positional_encoding(src)
-        
+
         for layer in self.encoder_layers:
             src = layer(src, self_attn_mask=src_mask)
-        
+
         encoder_output = src
 
         # --- Decoder ---
@@ -181,8 +172,10 @@ class CustomTransformer(nn.Module):
 
         # Generate Causal Mask for Decoder
         trg_seq_len = trg.size(1)
-        causal_mask = generate_square_subsequent_mask(trg_seq_len, trg.device)
-        
+
+        # --- FIX: Pass dtype=trg.dtype to match FP16/FP32 ---
+        causal_mask = generate_square_subsequent_mask(trg_seq_len, trg.device, dtype=trg.dtype)
+
         if trg_mask is not None:
             causal_mask = causal_mask + trg_mask
 
@@ -191,6 +184,8 @@ class CustomTransformer(nn.Module):
 
         output = self.fc_out(trg)
         return output
+
+# ... [Tokenizer and Data Loading functions remain unchanged] ...
 
 def create_tokenizer(model_directory_path):
     try:
@@ -206,7 +201,7 @@ def load_gpt2_tokenizer():
         tokenizer = AutoTokenizer.from_pretrained("gpt2")
         if tokenizer.pad_token is None:
             tokenizer.add_special_tokens({'pad_token': '[PAD]'})
-        
+
         tokenizer_len = len(tokenizer)
         print(f"load_gpt2_tokenizer() - Vocab size: {tokenizer_len}")
         return tokenizer, tokenizer_len
@@ -214,42 +209,53 @@ def load_gpt2_tokenizer():
         print(f"Error loading tokenizer: {e}")
         exit()
 
+# --- MODIFIED TRAINING FUNCTION FOR GPU ---
 def model_training(epochs, train_dataloader, val_dataloader, device, optimizer, criterion, model, model_save_dir, patience=5):
     print("model_training() - BEGIN")
     model.to(device)
-    
+
+    # Optional: Compile if this function is called directly
+    # model = torch.compile(model, mode="max-autotune")
+
     best_val_loss = float('inf')
     epochs_no_improve = 0
+
+    # --- RDNA 4 OPTIMIZATION: Scaler ---
+    scaler = torch.amp.GradScaler("cuda")
 
     for epoch in range(epochs):
         model.train()
         train_total_loss = 0
-        
+
         print(f"\nEpoch {epoch+1}/{epochs} [Training]", end="")
-        
+
         for i, batch in enumerate(train_dataloader):
             src_data = batch['input_ids'].to(device)
             trg_data = batch['labels'].to(device)
 
-            decoder_input = trg_data[:, :-1] # Remove EOS
-            labels = trg_data[:, 1:]         # Remove BOS/Start
+            decoder_input = trg_data[:, :-1]
+            labels = trg_data[:, 1:]
 
-            optimizer.zero_grad()
-            
+            optimizer.zero_grad(set_to_none=True)
+
             min_len = min(decoder_input.size(1), labels.size(1))
             decoder_input = decoder_input[:, :min_len]
             labels = labels[:, :min_len]
 
-            output = model(src_data, decoder_input)
-            
-            output_flat = output.reshape(-1, output.shape[-1])
-            labels_flat = labels.reshape(-1)
+            # --- RDNA 4 OPTIMIZATION: Autocast ---
+            with torch.autocast("cuda", dtype=torch.float16):
+                output = model(src_data, decoder_input)
+                output_flat = output.reshape(-1, output.shape[-1])
+                labels_flat = labels.reshape(-1)
+                loss = criterion(output_flat, labels_flat)
 
-            loss = criterion(output_flat, labels_flat)
-            loss.backward()
-            optimizer.step()
+            # --- RDNA 4 OPTIMIZATION: Backward ---
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+
             train_total_loss += loss.item()
-            
+
             if i % 10 == 0: print(".", end="", flush=True)
 
         train_avg_loss = train_total_loss / len(train_dataloader)
@@ -265,13 +271,16 @@ def model_training(epochs, train_dataloader, val_dataloader, device, optimizer, 
 
                 decoder_input = trg_data[:, :-1]
                 labels = trg_data[:, 1:]
-                
+
                 min_len = min(decoder_input.size(1), labels.size(1))
                 decoder_input = decoder_input[:, :min_len]
                 labels = labels[:, :min_len]
 
-                output = model(src_data, decoder_input)
-                loss = criterion(output.reshape(-1, output.shape[-1]), labels.reshape(-1))
+                # Use autocast for validation too (faster)
+                with torch.autocast("cuda", dtype=torch.float16):
+                    output = model(src_data, decoder_input)
+                    loss = criterion(output.reshape(-1, output.shape[-1]), labels.reshape(-1))
+
                 val_total_loss += loss.item()
 
         val_avg_loss = val_total_loss / len(val_dataloader)
@@ -291,6 +300,7 @@ def model_training(epochs, train_dataloader, val_dataloader, device, optimizer, 
                 print("Early stopping triggered.")
                 break
 
+# ... [The rest of the file (Data Loading, etc.) remains unchanged] ...
 def read_csv_line_by_line(dataset_file_path):
     print(f"Loading CSV: {dataset_file_path}")
     if not os.path.exists(dataset_file_path):
