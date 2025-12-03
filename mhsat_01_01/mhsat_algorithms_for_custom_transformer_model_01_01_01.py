@@ -7,19 +7,18 @@ import torch.nn.functional as F
 from transformers import AutoTokenizer
 from safetensors.torch import save_file
 from sklearn.model_selection import train_test_split
-import warnings
 from torch.utils.data import DataLoader, Dataset
 import os
 import glob
 import random
 
 # ------- Global Parameters -------
-TOKENIZATION_MAX_LENGTH = 128
-NUM_LAYERS = 6
-D_MODEL = 512
-NUM_HEADS = 8
-D_FF = 2048
-DROPOUT = 0.1
+TOKENIZATION_MAX_LENGTH = 256   # To prevent answer cut off. Gives the model more "runway" allows it to read longer Wikipedia contexts in Phase 1, making it smarter at constructing sentences.
+NUM_LAYERS = 12
+D_MODEL = 768
+NUM_HEADS = 12
+D_FF = 3072
+DROPOUT = 0.2   # In Transformer theory, the Feed Forward layer is usually 4 times the size of the Model Dimension (768 * 4). This gives the model more capacity to store "facts".
 # ---------------------------------
 
 class LiverQADataset(Dataset):
@@ -316,8 +315,8 @@ def read_csv_line_by_line(dataset_file_path):
 
 def load_general_knowledge_as_qa(path_pattern, num_samples=300, max_chars=1000):
     """
-    Loads general text files and formats them strictly as Question/Answer pairs
-    to match the liver dataset format.
+    Loads general text files and formats them strictly as Question/Answer pairs.
+    INCLUDES AGGRESSIVE CLEANING FOR GUTENBERG EBOOKS.
     """
     print(f"Loading General Knowledge data from: {path_pattern}")
     files = glob.glob(path_pattern)
@@ -337,29 +336,43 @@ def load_general_knowledge_as_qa(path_pattern, num_samples=300, max_chars=1000):
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 text = f.read()
 
-                # --- DATA CLEANING ---
-                # Remove common Gutenberg/Wiki headers to avoid "Australia eBooks"
+                # --- 1. REMOVE GUTENBERG HEADERS/FOOTERS ---
+                # Most Project Gutenberg files have these markers. We want the text BETWEEN them.
+                if "*** START OF THIS PROJECT GUTENBERG" in text:
+                    text = text.split("*** START OF THIS PROJECT GUTENBERG")[-1]
+                if "*** START OF THE PROJECT GUTENBERG" in text:
+                    text = text.split("*** START OF THE PROJECT GUTENBERG")[-1]
+
+                if "*** END OF THIS PROJECT GUTENBERG" in text:
+                    text = text.split("*** END OF THIS PROJECT GUTENBERG")[0]
+                if "*** END OF THE PROJECT GUTENBERG" in text:
+                    text = text.split("*** END OF THE PROJECT GUTENBERG")[0]
+
+                # --- 2. CLEAN LINES ---
                 lines = text.split('\n')
-                # We only keep lines that look like real sentences (length > 20, no '==')
-                clean_lines = [line for line in lines if len(line) > 20 and "==" not in line and "eBook" not in line]
+                clean_lines = []
+                for line in lines:
+                    line = line.strip()
+                    # Skip empty lines, short lines, or metadata lines
+                    if len(line) < 50: continue
+                    if "eBook" in line or "http" in line or "www." in line: continue
+                    if "Project Gutenberg" in line: continue
+                    if line.isupper(): continue  # Skip CHAPTER TITLES
+
+                    clean_lines.append(line)
+
                 text = " ".join(clean_lines)
 
+                # Ensure we still have content
                 if len(text) < 100:
                     continue
 
-                # Let's take a block of text
+                # --- 3. CREATE QA PAIR ---
                 text = text[:max_chars]
-
-                # --- FORMATTING TRICK ---
-                # Instead of brutally cutting it in half, let's create a fake question.
-                # We use the first 50 characters as context.
-                split_idx = 100  # We use the first 100 characters as a "prompt"
-
+                split_idx = 100
                 context_preview = text[:split_idx]
                 rest_of_text = text[split_idx:]
 
-                # Let's create a question that the model can understand
-                # We insert the prefix we use in the liver dataset
                 fake_question = f"Complete the following text: {context_preview}..."
 
                 questions.append(fake_question)
