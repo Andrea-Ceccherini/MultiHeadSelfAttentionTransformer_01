@@ -1,3 +1,62 @@
+"""
+This script (mhsat_phase_1_fast_memmap.py) is the core "Brain Builder". It performs the heavy lifting of teaching the
+neural network how to understand and generate English.
+
+The train_fast function is a classic Deep Learning training loop.
+
+    Forward Pass: It feeds numbers (tokens) into the model (output = model(...)).
+
+    Loss Calculation: It calculates how wrong the model's guess was compared to the actual text (loss = criterion(...)).
+
+    Backward Pass: It calculates the gradients (loss.backward()).
+
+    Optimization: It updates the model's internal numbers (weights) to make it smarter (optimizer.step()).
+
+This process happens thousands of times per hour. This IS the learning phase.
+
+create the Model
+    In Memory: The line model = CustomTransformer(...) creates the "empty brain" (randomly initialized neural network) inside your RAM.
+
+    On Disk: The code save_file(model.state_dict(), ... "latest_checkpoint.safetensors") takes that "brain," which is getting smarter every minute, and saves it to your hard drive.
+
+The Result
+
+    When this script finishes (or when you stop it), you will have a file named latest_checkpoint.safetensors in
+    unsupervised_model_weights/latest_checkpoint.safetensors.
+
+    The script only creates the folder and the file when it hits Step 1000.
+
+    Your script is configured to save a checkpoint every 1,000 steps.
+
+    Last Save: Step 1,000
+
+    Next Save: Step 2,000
+
+    Following Saves: Step 3,000, 4,000, 5,000, etc.
+
+    Target Loss: ~3.5 to 4.0 that could around step 50000 of epoch 1. You can stop manually when target loos reaches
+    ~3.5 to 4.0
+    If you don't stop manually it will run till epoch 1 is finishes that will happen around step 525,690
+    The Math
+
+    Total Tokens: 4,306,458,971
+    Tokens consumed per Step:
+        Sequence Length: 256
+        Physical Batch: 4
+        Accumulation: 8
+        Total: 256×4×8=8,192256×4×8=8,192 tokens per step.
+
+        4,306,458,971 tokens/8,192 tokens/step ≈ 525,690 Steps
+
+    You do not need to reach Step 525,690. The model will likely be fully trained and smart enough between Step 50,000 and Step 100,000.
+    If you stop script at step 3000 and then you re-lunch it after 4 hours it will start from the saved latest_checkpoint.safetensors stopped step 3000?
+
+
+That file IS your model. You can load that file later to chat with it, fine-tune it on liver data, or use it for any other English task.
+
+"""
+
+
 import os
 import sys
 import numpy as np
@@ -30,7 +89,7 @@ DROPOUT = 0.2
 # --- STABLE TRAINING PARAMS ---
 BATCH_SIZE = 4
 ACCUMULATION_STEPS = 8
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 5e-4
 
 
 # --- MEMORY MAPPED DATASET ---
@@ -127,6 +186,24 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
 
+    # Check if a checkpoint exists - Resume Logic if latest_checkpoint.safetensors has been stopped at certain number of nx1000 steps with n = 1, 2, 3, ...
+    checkpoint_path = os.path.join("unsupervised_model_weights", "latest_checkpoint.safetensors")
+
+    if os.path.exists(checkpoint_path):
+        print(f"🔄 Found checkpoint: {checkpoint_path}")
+        print("   Loading weights to RESUME training...")
+        try:
+            # Load the weights into the model
+            from safetensors.torch import load_file
+
+            model.load_state_dict(load_file(checkpoint_path))
+            print("   ✅ Resume successful! The model is smart again.")
+        except Exception as e:
+            print(f"   ⚠️ Error loading checkpoint: {e}")
+            print("   Starting from scratch.")
+    else:
+        print("🆕 No checkpoint found. Starting training from scratch.")
+
     # Dataset (Instant Load)
     dataset = MemmapDataset(DATA_BIN_PATH, TOKENIZATION_MAX_LENGTH)
 
@@ -134,7 +211,7 @@ if __name__ == "__main__":
     dataloader = DataLoader(
         dataset,
         batch_size=BATCH_SIZE,
-        shuffle=True,  # This drastically improves training quality vs streaming
+        shuffle=False, # <--- "Easy Mode" (Sequential)
         num_workers=4,  # You can try increasing this to 4 or 8 since we read from binary
         pin_memory=True
     )

@@ -1,3 +1,19 @@
+"""
+This script is a Data Pre-processor. Its specific job is to convert your massive collection of text files
+(Wikipedia + Books) into a single, highly optimized Binary File (.bin).
+
+It acts as the bridge between your raw data (text) and the high-speed training script (numbers).
+
+Here is a breakdown of exactly what it does and why it is superior to the previous methods:
+
+    Input: Thousands of text files (Slow to open, messy encodings).
+
+    Output: One single file of pure numbers (Instant to load, crash-proof).
+
+    You must run this script once before you can run the "Fast Memmap" training script.
+"""
+
+
 import os
 import glob
 import numpy as np

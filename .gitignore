@@ -7,3 +7,4 @@
 /mhsat_01_01/__pycache__/__init__.cpython-311.pyc
 /mhsat_01_01/__pycache__/mhsat_algorithms_for_custom_transformer_model_01_01_01.cpython-311.pyc
 *.whl
+*.bin
