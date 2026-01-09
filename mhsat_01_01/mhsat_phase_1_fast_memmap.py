@@ -89,7 +89,7 @@ DROPOUT = 0.2
 # --- STABLE TRAINING PARAMS ---
 BATCH_SIZE = 4
 ACCUMULATION_STEPS = 8
-LEARNING_RATE = 5e-4
+LEARNING_RATE = 1e-4
 
 
 # --- MEMORY MAPPED DATASET ---
@@ -120,7 +120,7 @@ class MemmapDataset(Dataset):
 
 
 def train_fast(epochs, dataloader, device, optimizer, criterion, model, save_dir):
-    print("--- Phase 1 Training (Fast Memmap Mode) BEGIN ---")
+    print("--- Phase 1 Training (Fast Memmap Mode - BULLETPROOF) BEGIN ---")
     model.to(device)
     model.train()
 
@@ -132,7 +132,6 @@ def train_fast(epochs, dataloader, device, optimizer, criterion, model, save_dir
     for epoch in range(epochs):
         print(f"\n--- Epoch {epoch + 1}/{epochs} ---")
 
-        # Enumerate gives us a progress bar naturally
         for i, batch in enumerate(dataloader):
             src_data = batch['input_ids'].to(device)
             decoder_input = src_data[:, :-1]
@@ -141,6 +140,13 @@ def train_fast(epochs, dataloader, device, optimizer, criterion, model, save_dir
             with torch.autocast("cuda", dtype=torch.float16):
                 output = model(src_data, decoder_input)
                 loss = criterion(output.reshape(-1, output.shape[-1]), labels.reshape(-1))
+
+                # Check for NaN immediately
+                if torch.isnan(loss):
+                    print(f"\n⚠️ WARNING: NaN detected at batch {i}. Skipping update.")
+                    optimizer.zero_grad(set_to_none=True)
+                    continue
+
                 loss = loss / ACCUMULATION_STEPS
 
             scaler.scale(loss).backward()
@@ -149,6 +155,12 @@ def train_fast(epochs, dataloader, device, optimizer, criterion, model, save_dir
             total_loss += current_loss_val
 
             if (i + 1) % ACCUMULATION_STEPS == 0:
+                # --- SAFETY BRAKE: Gradient Clipping ---
+                # Unscale the gradients so we can check their size
+                scaler.unscale_(optimizer)
+                # Clip gradients to max norm 1.0 (Prevents explosion)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+
                 scaler.step(optimizer)
                 scaler.update()
                 optimizer.zero_grad(set_to_none=True)
@@ -211,7 +223,7 @@ if __name__ == "__main__":
     dataloader = DataLoader(
         dataset,
         batch_size=BATCH_SIZE,
-        shuffle=False, # <--- "Easy Mode" (Sequential)
+        shuffle=True,
         num_workers=4,  # You can try increasing this to 4 or 8 since we read from binary
         pin_memory=True
     )
