@@ -16,7 +16,7 @@ from safetensors.torch import load_file
 
 # --- CONFIGURATION ---
 # MODEL_PATH = "supervised_qa_model_files/fine_tuned_best.safetensors"
-MODEL_PATH = "unsupervised_model_weights/latest_checkpoint.safetensors"  # for test purpose: Check the Foundation
+MODEL_PATH = "unsupervised_model_weights/latest_checkpoint_67000.safetensors"  # for test purpose: Check the Foundation
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
