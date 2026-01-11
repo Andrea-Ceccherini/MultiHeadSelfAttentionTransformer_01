@@ -27,7 +27,7 @@ from mhsat_algorithms_for_custom_transformer_model_01_01_01 import (
 # --- CONFIGURATION (STABLE MODE) ---
 BATCH_SIZE = 4  # REDUCED from 8 to 4 to prevent Error 700
 ACCUMULATION_STEPS = 2  # ACCUMULATE gradients to simulate Batch Size 8
-EPOCHS = 4
+EPOCHS = 3
 LEARNING_RATE = 1e-5
 PATIENCE = 2
 
@@ -48,7 +48,7 @@ class BalancedFineTuningDataset(Dataset):
                 next(reader, None)  # Skip header
                 for row in reader:
                     if len(row) >= 2:
-                        text = f"Question: {row[0]} Answer: {row[1]}"
+                        text = f"Question: {row[0]} Answer: {row[1]}{self.tokenizer.eos_token}"
                         self.samples.append(text)
                         liver_count += 1
         except FileNotFoundError:
@@ -69,7 +69,7 @@ class BalancedFineTuningDataset(Dataset):
                     buffer += " " + line
 
                     if len(buffer.split()) > 50:
-                        wiki_samples.append(buffer.strip())
+                        wiki_samples.append(buffer.strip() + self.tokenizer.eos_token)
                         buffer = ""
                         if len(wiki_samples) >= liver_count * 2:
                             break
@@ -161,7 +161,8 @@ if __name__ == "__main__":
     liver_csv = "../../../Datasets/LiverDataset/liver_questions_and_answers_999.csv"
     wiki_txt = "../../../Datasets/WikipediaDump/Final_Training_Data/train_chunk_001.txt"
 
-    pretrained_path = os.path.join("unsupervised_model_weights", "latest_checkpoint.safetensors")
+    # pretrained_path = os.path.join("unsupervised_model_weights", "latest_checkpoint.safetensors")
+    pretrained_path = os.path.join("unsupervised_model_weights", "phase1_FINAL_3.77.safetensors")
     save_dir = "supervised_qa_model_files"
 
     tokenizer, vocab_size = load_gpt2_tokenizer()

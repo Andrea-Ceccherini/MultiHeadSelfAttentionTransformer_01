@@ -16,9 +16,10 @@ from safetensors.torch import load_file
 
 # --- CONFIGURATION ---
 # MODEL_PATH = "supervised_qa_model_files/fine_tuned_best.safetensors"
-MODEL_PATH = "unsupervised_model_weights/latest_checkpoint_67000.safetensors"  # for test purpose: Check the Foundation
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+MODEL_PATH = "unsupervised_model_weights/phase1_FINAL_3.77.safetensors"
 
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+print("MODEL_PATH = ", MODEL_PATH)
 
 def load_model():
     print(f"Loading Tokenizer...")
@@ -45,11 +46,16 @@ def load_model():
     return model, tokenizer
 
 
-def generate_text(model, tokenizer, prompt, max_new_tokens=50, temperature=0.8):
+def generate_text(model, tokenizer, question, max_new_tokens=100, temperature=0.6):
+    # 1. Format the input EXACTLY like Phase 2 training
+    # The model expects "Question: ... Answer:"
+    prompt = f"Question: {question} Answer:"
+
     input_ids = tokenizer.encode(prompt, return_tensors='pt').to(DEVICE)
 
-    print(f"\n🔍 Generating from: '{prompt}'")
+    print(f"\n🔍 Input Prompt: '{prompt}'")
 
+    # Generate loop
     for i in range(max_new_tokens):
         cond_ids = input_ids[:, -TOKENIZATION_MAX_LENGTH:]
 
@@ -57,11 +63,9 @@ def generate_text(model, tokenizer, prompt, max_new_tokens=50, temperature=0.8):
             outputs = model(cond_ids, cond_ids)
             next_token_logits = outputs[:, -1, :]
 
-            # --- FORCE TALK FIX ---
-            # Manually set the probability of EOS (50256) to negative infinity
-            # This makes it impossible for the model to stop.
-            if tokenizer.eos_token_id is not None:
-                next_token_logits[:, tokenizer.eos_token_id] = -float('inf')
+            # --- CRITICAL CHANGE: ALLOW EOS ---
+            # We removed the block that set EOS to -inf.
+            # Now the model is allowed to stop.
 
             # Temperature
             next_token_logits = next_token_logits / temperature
@@ -69,44 +73,55 @@ def generate_text(model, tokenizer, prompt, max_new_tokens=50, temperature=0.8):
 
             # Sample
             next_token_id = torch.multinomial(probs, num_samples=1)
+
+            # --- STOPPING CONDITIONS ---
+            # 1. If it predicts EOS, stop.
+            if next_token_id.item() == tokenizer.eos_token_id:
+                break
+
             input_ids = torch.cat([input_ids, next_token_id], dim=1)
 
-            # Debug: Print tokens as they appear
-            word = tokenizer.decode(next_token_id[0])
-            print(f"   Step {i + 1}: {word} (ID: {next_token_id.item()})")
+            # 2. Check if it generated a new "Question:" tag (Hallucination loop)
+            # This is a simple heuristic to stop it from rambling
+            current_text = tokenizer.decode(input_ids[0])
+            if "Question:" in current_text[len(prompt):]:
+                # If "Question:" appears AFTER our prompt, stop.
+                break
 
+    # Decode and clean up
     full_text = tokenizer.decode(input_ids[0], skip_special_tokens=True)
-    return full_text
+
+    # Extract just the answer part
+    if "Answer:" in full_text:
+        answer = full_text.split("Answer:")[1].strip()
+        # Clean up any trailing "Question:" if the loop didn't catch it
+        answer = answer.split("Question:")[0].strip()
+        return answer
+    else:
+        return full_text
 
 
 if __name__ == "__main__":
     model, tokenizer = load_model()
     print("✅ Model Loaded. Ready to chat.\n")
 
-    # Test Prompts
     test_questions = [
         "What is the function of the liver?",
         "What are the symptoms of hepatitis?",
-        "The capital of France is",  # General knowledge test
-        "Explain bile production."
+        "The capital of France is",
     ]
 
     print("--- AUTOMATIC TESTS ---")
     for q in test_questions:
-        print(f"\n❓ Input: {q}")
-        # We assume the dataset format was "Question: ... Answer: ..." or similar.
-        # Let's prompt it slightly to encourage an answer.
-        # If your CSV just had raw text, standard prompting works.
-        response = generate_text(model, tokenizer, q, max_new_tokens=60)
-        print(f"🤖 Output: {response}")
+        response = generate_text(model, tokenizer, q)
+        print(f"🤖 Answer: {response}")
         print("-" * 30)
 
     print("\n--- INTERACTIVE MODE ---")
-    print("Type 'exit' to quit.")
     while True:
-        user_input = input("\nYou: ")
+        user_input = input("\nAsk about Liver (or anything): ")
         if user_input.lower() in ["exit", "quit"]:
             break
 
-        response = generate_text(model, tokenizer, user_input, max_new_tokens=100)
+        response = generate_text(model, tokenizer, user_input)
         print(f"Bot: {response}")
