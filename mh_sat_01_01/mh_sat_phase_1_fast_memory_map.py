@@ -1,5 +1,5 @@
 """
-This script (mhsat_phase_1_fast_memmap.py) is the core "Brain Builder". It performs the heavy lifting of teaching the
+This script (mh_sat_phase_1_fast_memory_map.py) is the core "Brain Builder". It performs the heavy lifting of teaching the
 neural network how to understand and generate English.
 
 The train_fast function is a classic Deep Learning training loop.
@@ -73,12 +73,12 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from safetensors.torch import save_file
 
-from mhsat_algorithms_for_custom_transformer_model_01_01_01 import (
+from mh_sat_algorithms_for_custom_transformer_model import (
     CustomTransformer, load_gpt2_tokenizer
 )
 
 # --- CONFIGURATION ---
-DATA_BIN_PATH = "wiki_books_dataset.bin"
+DATA_BIN_PATH = "../wiki_books_dataset/wiki_books_dataset.bin"
 TOKENIZATION_MAX_LENGTH = 256
 NUM_LAYERS = 12
 D_MODEL = 768
@@ -119,32 +119,32 @@ class MemmapDataset(Dataset):
         return {'input_ids': chunk}
 
 
-def train_fast(epochs, dataloader, device, optimizer, criterion, model, save_dir):
+def train_fast(epochs_, dataloader_, device_, optimizer_, criterion_, model_, save_dir_):
     print("--- Phase 1 Training (Fast Memmap Mode - BULLETPROOF) BEGIN ---")
-    model.to(device)
-    model.train()
+    model_.to(device_)
+    model_.train()
 
     scaler = torch.amp.GradScaler("cuda")
     steps = 0
     total_loss = 0
-    optimizer.zero_grad(set_to_none=True)
+    optimizer_.zero_grad(set_to_none=True)
 
-    for epoch in range(epochs):
-        print(f"\n--- Epoch {epoch + 1}/{epochs} ---")
+    for epoch in range(epochs_):
+        print(f"\n--- Epoch {epoch + 1}/{epochs_} ---")
 
-        for i, batch in enumerate(dataloader):
-            src_data = batch['input_ids'].to(device)
+        for i, batch in enumerate(dataloader_):
+            src_data = batch['input_ids'].to(device_)
             decoder_input = src_data[:, :-1]
             labels = src_data[:, 1:]
 
             with torch.autocast("cuda", dtype=torch.float16):
-                output = model(src_data, decoder_input)
-                loss = criterion(output.reshape(-1, output.shape[-1]), labels.reshape(-1))
+                output = model_(src_data, decoder_input)
+                loss = criterion_(output.reshape(-1, output.shape[-1]), labels.reshape(-1))
 
                 # Check for NaN immediately
                 if torch.isnan(loss):
                     print(f"\n⚠️ WARNING: NaN detected at batch {i}. Skipping update.")
-                    optimizer.zero_grad(set_to_none=True)
+                    optimizer_.zero_grad(set_to_none=True)
                     continue
 
                 loss = loss / ACCUMULATION_STEPS
@@ -157,13 +157,13 @@ def train_fast(epochs, dataloader, device, optimizer, criterion, model, save_dir
             if (i + 1) % ACCUMULATION_STEPS == 0:
                 # --- SAFETY BRAKE: Gradient Clipping ---
                 # Unscale the gradients so we can check their size
-                scaler.unscale_(optimizer)
+                scaler.unscale_(optimizer_)
                 # Clip gradients to max norm 1.0 (Prevents explosion)
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                torch.nn.utils.clip_grad_norm_(model_.parameters(), 1.0)
 
-                scaler.step(optimizer)
+                scaler.step(optimizer_)
                 scaler.update()
-                optimizer.zero_grad(set_to_none=True)
+                optimizer_.zero_grad(set_to_none=True)
                 steps += 1
 
                 if steps % 100 == 0:
@@ -172,8 +172,8 @@ def train_fast(epochs, dataloader, device, optimizer, criterion, model, save_dir
 
                 if steps % 1000 == 0:
                     print(f"\n   💾 Saving Checkpoint at Step {steps}...")
-                    os.makedirs(save_dir, exist_ok=True)
-                    save_file(model.state_dict(), os.path.join(save_dir, "latest_checkpoint.safetensors"))
+                    os.makedirs(save_dir_, exist_ok=True)
+                    save_file(model_.state_dict(), os.path.join(save_dir_, "latest_checkpoint.safetensors"))
                     torch.cuda.empty_cache()
 
         print(f"\nEpoch {epoch + 1} Complete.")
@@ -199,7 +199,7 @@ if __name__ == "__main__":
     print(f"Device: {device}")
 
     # Check if a checkpoint exists - Resume Logic if latest_checkpoint.safetensors has been stopped at certain number of nx1000 steps with n = 1, 2, 3, ...
-    checkpoint_path = os.path.join("unsupervised_model_weights", "latest_checkpoint.safetensors")
+    checkpoint_path = os.path.join("../mh_sat_01_01/unsupervised_model_weights", "latest_checkpoint.safetensors")
 
     if os.path.exists(checkpoint_path):
         print(f"🔄 Found checkpoint: {checkpoint_path}")
@@ -232,6 +232,6 @@ if __name__ == "__main__":
     criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
 
     # Train
-    train_fast(1, dataloader, device, optimizer, criterion, model, "unsupervised_model_weights")
+    train_fast(1, dataloader, device, optimizer, criterion, model, "../mh_sat_01_01/unsupervised_model_weights")
 
     print(f"Elapsed: {datetime.now() - begin_time}")

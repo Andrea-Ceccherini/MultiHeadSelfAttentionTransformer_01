@@ -16,7 +16,7 @@ from safetensors.torch import load_file
 
 # --- CONFIGURATION ---
 # MODEL_PATH = "supervised_qa_model_files/fine_tuned_best.safetensors"
-MODEL_PATH = "unsupervised_model_weights/phase1_FINAL_3.77.safetensors"
+MODEL_PATH = "../mh_sat_01_01/unsupervised_model_weights/phase1_FINAL_3.77.safetensors"
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print("MODEL_PATH = ", MODEL_PATH)

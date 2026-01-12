@@ -18,10 +18,10 @@ import os
 import glob
 import numpy as np
 from tqdm import tqdm  # pip install tqdm
-from mhsat_algorithms_for_custom_transformer_model_01_01_01 import load_gpt2_tokenizer
+from mh_sat_algorithms_for_custom_transformer_model import load_gpt2_tokenizer
 
 # --- CONFIGURATION ---
-OUTPUT_FILE = "wiki_books_dataset.bin"
+OUTPUT_FILE = "../wiki_books_dataset/wiki_books_dataset.bin"
 DATA_FOLDERS = [
     "../../../Datasets/Txt_Books/",
     "../../../Datasets/Au_Books/",
