@@ -2,15 +2,12 @@ import os
 import sys
 import csv
 import random
+from tqdm import tqdm
 
-# --- CRITICAL HARDWARE FIX ---
-os.environ["HSA_OVERRIDE_GFX_VERSION"] = "11.0.3"
-
-# --- REMOVED THE BLOCK THAT DELETES SERIALIZE_KERNEL ---
-# We keep it because your logs show the GPU crashes without it.
-
-# Debugging (See progress)
-os.environ["AMD_LOG_LEVEL"] = "3"
+# --- CPU CONFIGURATION ---
+# We force PyTorch to ignore the GPU to avoid driver hangs
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import torch
 import torch.nn as nn
@@ -44,6 +41,7 @@ class BalancedFineTuningDataset(Dataset):
                 next(reader, None)
                 for row in reader:
                     if len(row) >= 2:
+                        # EOS Token included
                         text = f"Question: {row[0]} Answer: {row[1]}{self.tokenizer.eos_token}"
                         self.samples.append(text)
         except FileNotFoundError:
@@ -61,6 +59,7 @@ class BalancedFineTuningDataset(Dataset):
                     if not line: continue
                     buffer += " " + line
                     if len(buffer.split()) > 50:
+                        # EOS Token included
                         wiki_samples.append(buffer.strip() + self.tokenizer.eos_token)
                         buffer = ""
                         if len(wiki_samples) >= liver_count * 2:
@@ -86,25 +85,25 @@ class BalancedFineTuningDataset(Dataset):
 
 
 def train_loop(epochs_, train_dl_, device_, optimizer_, criterion_, model_, save_dir_):
-    print(f"Training on device: {device_}")
-    print("Moving to GPU (Compiling kernels... please wait up to 5 mins)...")
-
+    print(f"Training on device: {device_} (Safe Mode)")
     model_.to(device_)
     model_.train()
-    print("✅ Model moved. Starting Epoch 1...")
 
+    # Pure FP32 training (No Scaler needed for CPU)
     for epoch in range(epochs_):
         total_loss = 0
         steps = 0
         optimizer_.zero_grad()
 
-        print(f"\n--- Epoch {epoch + 1}/{epochs_} ---")
+        # Progress bar
+        progress_bar = tqdm(enumerate(train_dl_), total=len(train_dl_), desc=f"Epoch {epoch + 1}", unit="batch")
 
-        for i, batch in enumerate(train_dl_):
+        for i, batch in progress_bar:
             src_data = batch['input_ids'].to(device_)
             decoder_input = src_data[:, :-1]
             labels = src_data[:, 1:]
 
+            # Forward pass
             output = model_(src_data, decoder_input)
             loss = criterion_(output.reshape(-1, output.shape[-1]), labels.reshape(-1))
 
@@ -112,6 +111,7 @@ def train_loop(epochs_, train_dl_, device_, optimizer_, criterion_, model_, save
             loss.backward()
 
             if (i + 1) % ACCUMULATION_STEPS == 0:
+                # Gradient Clipping
                 torch.nn.utils.clip_grad_norm_(model_.parameters(), 1.0)
                 optimizer_.step()
                 optimizer_.zero_grad()
@@ -120,22 +120,20 @@ def train_loop(epochs_, train_dl_, device_, optimizer_, criterion_, model_, save
                 total_loss += current_loss
                 steps += 1
 
-                if steps % 50 == 0:
-                    print(f"\rStep {steps} | Loss: {current_loss:.4f}", end="")
-                    if device_ == "cuda":
-                        torch.cuda.empty_cache()
+                progress_bar.set_postfix(loss=f"{current_loss:.4f}", avg_loss=f"{(total_loss / steps):.4f}")
 
         avg = total_loss / steps if steps > 0 else 0
-        print(f"\n   Avg Loss: {avg:.4f}")
+        print(f"\n✅ Epoch {epoch + 1} Finished. Avg Loss: {avg:.4f}")
 
         os.makedirs(save_dir_, exist_ok=True)
         save_file(model_.state_dict(), os.path.join(save_dir_, "fine_tuned_best.safetensors"))
 
 
 if __name__ == "__main__":
-    print("MAIN (GPU FP32 SERIALIZED MODE) - BEGIN")
+    print("MAIN (CPU SAFE MODE) - BEGIN")
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # FORCE CPU
+    device = "cpu"
 
     liver_csv = "../../../Datasets/LiverDataset/liver_questions_and_answers_999.csv"
     wiki_txt = "../../../Datasets/WikipediaDump/Final_Training_Data/train_chunk_001.txt"
