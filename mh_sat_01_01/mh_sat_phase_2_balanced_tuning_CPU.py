@@ -2,20 +2,11 @@ import os
 import sys
 import csv
 import random
-from torch.utils import collect_env
+from tqdm import tqdm
 
-# --- CRITICAL HARDWARE FIX FOR RX 9070 XT (RDNA 4) ---
-# We force RDNA 3 compatibility. Since Phase 1 worked with this, we stick to it.
-os.environ["HSA_OVERRIDE_GFX_VERSION"] = "11.0.3"
-
-# --- SYSTEM CONFIGURATION ---
+# --- FORCE CPU MODE ---
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ["PYTORCH_ALLOC_CONF"] = "max_split_size_mb:128"
-os.environ.pop("AMD_SERIALIZE_KERNEL", None)
-os.environ['LD_LIBRARY_PATH'] = '/opt/rocm/lib:' + os.environ.get('LD_LIBRARY_PATH', '')
-
-# Debugging (Optional, can remove if too noisy)
-os.environ["AMD_LOG_LEVEL"] = "3"
 
 import torch
 import torch.nn as nn
@@ -49,7 +40,6 @@ class BalancedFineTuningDataset(Dataset):
                 next(reader, None)
                 for row in reader:
                     if len(row) >= 2:
-                        # EOS Token is Critical
                         text = f"Question: {row[0]} Answer: {row[1]}{self.tokenizer.eos_token}"
                         self.samples.append(text)
         except FileNotFoundError:
@@ -67,7 +57,6 @@ class BalancedFineTuningDataset(Dataset):
                     if not line: continue
                     buffer += " " + line
                     if len(buffer.split()) > 50:
-                        # EOS Token is Critical
                         wiki_samples.append(buffer.strip() + self.tokenizer.eos_token)
                         buffer = ""
                         if len(wiki_samples) >= liver_count * 2:
@@ -94,13 +83,8 @@ class BalancedFineTuningDataset(Dataset):
 
 def train_loop(epochs_, train_dl_, device_, optimizer_, criterion_, model_, save_dir_):
     print(f"Training on device: {device_}")
-
-    # Move model
     model_.to(device_)
     model_.train()
-
-    # Enable Mixed Precision (Matches Phase 1 Stability)
-    scaler = torch.amp.GradScaler("cuda")
 
     for epoch in range(epochs_):
         total_loss = 0
@@ -109,103 +93,46 @@ def train_loop(epochs_, train_dl_, device_, optimizer_, criterion_, model_, save
 
         print(f"\n--- Epoch {epoch + 1}/{epochs_} ---")
 
-        for i, batch in enumerate(train_dl_):
+        # CPU training needs a progress bar because it's slower per step
+        progress_bar = tqdm(enumerate(train_dl_), total=len(train_dl_), desc=f"Epoch {epoch + 1}")
+
+        for i, batch in progress_bar:
             src_data = batch['input_ids'].to(device_)
             decoder_input = src_data[:, :-1]
             labels = src_data[:, 1:]
 
-            # Autocast (FP16) - This worked for your Phase 1
-            with torch.autocast("cuda", dtype=torch.float16):
-                output = model_(src_data, decoder_input)
-                loss = criterion_(output.reshape(-1, output.shape[-1]), labels.reshape(-1))
-                loss = loss / ACCUMULATION_STEPS
+            output = model_(src_data, decoder_input)
+            loss = criterion_(output.reshape(-1, output.shape[-1]), labels.reshape(-1))
 
-            # Scaled Backward
-            scaler.scale(loss).backward()
+            loss = loss / ACCUMULATION_STEPS
+            loss.backward()
 
             if (i + 1) % ACCUMULATION_STEPS == 0:
-                # Gradient Clipping
-                scaler.unscale_(optimizer_)
                 torch.nn.utils.clip_grad_norm_(model_.parameters(), 1.0)
-
-                scaler.step(optimizer_)
-                scaler.update()
+                optimizer_.step()
                 optimizer_.zero_grad()
 
                 current_loss = loss.item() * ACCUMULATION_STEPS
                 total_loss += current_loss
                 steps += 1
 
-                if steps % 50 == 0:
-                    print(f"\rStep {steps} | Loss: {current_loss:.4f}", end="")
-                    # Clear cache to keep RDNA4 happy
-                    torch.cuda.empty_cache()
+                progress_bar.set_postfix(loss=f"{current_loss:.4f}")
 
         avg = total_loss / steps if steps > 0 else 0
-        print(f"\n   Avg Loss: {avg:.4f}")
+        print(f"\n✅ Epoch {epoch + 1} Finished. Avg Loss: {avg:.4f}")
 
         os.makedirs(save_dir_, exist_ok=True)
         save_file(model_.state_dict(), os.path.join(save_dir_, "fine_tuned_best.safetensors"))
 
 
-def print_hw_and_drivers_versions():
-    print("\n--- RX 9070 XT Check ---")
-    device_ = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Target Device: {device_}")
-    print(f"HSA Override: {os.environ.get('HSA_OVERRIDE_GFX_VERSION')}")
-    print("------------------------\n")
-
-
-def get_complete_system_info():
-    """
-    Collects standard PyTorch environment info plus specific
-    environment variables relevant to AMD ROCm setup.
-    """
-    # 1. Get the standard report (The output you posted)
-    raw_report = collect_env.get_pretty_env_info()
-
-    # 2. Add custom check for your specific AMD/RDNA4 variables
-    # This helps confirm if your script is actually seeing the overrides
-    custom_vars = [
-        "HSA_OVERRIDE_GFX_VERSION",  # Critical for RX 9070 XT
-        "AMD_SERIALIZE_KERNEL",  # Critical for stability
-        "PYTORCH_ALLOC_CONF",
-        "LD_LIBRARY_PATH",
-        "ROCM_PATH"
-    ]
-
-    extra_info = "\n\n---------- CUSTOM ENV VARIABLES CHECK ----------\n"
-    for var in custom_vars:
-        value = os.environ.get(var, "Not Set")
-        extra_info += f"{var}: {value}\n"
-
-    # 3. Add explicit GPU capability check
-    gpu_check = "\n---------- PYTORCH INTERNAL GPU CHECK ----------\n"
-    if torch.cuda.is_available():
-        try:
-            gpu_check += f"Is CUDA available: {torch.cuda.is_available()}\n"
-            gpu_check += f"Device Name: {torch.cuda.get_device_name(0)}\n"
-            gpu_check += f"Device Capability: {torch.cuda.get_device_capability(0)}\n"
-        except Exception as e:
-            gpu_check += f"Error querying GPU: {e}\n"
-    else:
-        gpu_check += "CUDA/ROCm not available in PyTorch.\n"
-
-    return raw_report + extra_info + gpu_check
-
-
 if __name__ == "__main__":
-    print("MAIN (RDNA4 STABLE MODE) - BEGIN")
+    print("MAIN (CPU SAFE MODE) - BEGIN")
 
-    print_hw_and_drivers_versions()
-    report = get_complete_system_info()
-    print("report =", report)
-
-    # Auto-detect ROCm/CUDA
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cpu"
 
     liver_csv = "../../../Datasets/LiverDataset/liver_questions_and_answers_999.csv"
     wiki_txt = "../../../Datasets/WikipediaDump/Final_Training_Data/train_chunk_001.txt"
+    # Point to your good Step 27k checkpoint
     pretrained_path = os.path.join("../mh_sat_01_01/unsupervised_model_weights", "latest_checkpoint_27000.safetensors")
     save_dir = "../mh_sat_01_01/supervised_model_weights"
 

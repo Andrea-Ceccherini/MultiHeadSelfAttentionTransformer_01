@@ -17,7 +17,7 @@ code Bash
 cd /home/andrea/PycharmProjects/MultiHeadSelfAttentionTransformer_01/
 
 # Run the conversion script located in your home folder
-python ~/llama.cpp/convert_hf_to_gguf.py hf_model_export --outfile my_liver_model.gguf
+python ~/llama.cpp/convert_hf_to_gguf.py hugging_face_model_distribution_format --outfile my_liver_model.gguf
 
 
 
@@ -42,7 +42,7 @@ from mhsat_algorithms_for_custom_transformer_model_01_01_01 import (
 # Input: Your best fine-tuned model
 INPUT_WEIGHTS = "supervised_qa_model_files/fine_tuned_best.safetensors"
 # Output: Where we put the converted model
-OUTPUT_DIR = "hf_model_export"
+OUTPUT_DIR = "hugging_face_model_distribution_format"
 
 
 def export_model():
