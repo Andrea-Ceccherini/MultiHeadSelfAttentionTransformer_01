@@ -14,3 +14,8 @@
 /mh_sat_01_01/onnx_model_distribution_format/
 *.data
 /mh_sat_01_01/hugging_face_model_distribution_format/
+/custom_tokenizer_files/
+*.txt
+*.json
+/bin_dataset/
+/mh_sa_custom_transformer_01_01/__pycache__/
