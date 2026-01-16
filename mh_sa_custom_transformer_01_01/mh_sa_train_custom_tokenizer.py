@@ -1,16 +1,30 @@
+"""
+This script is designed to train a Custom Tokenizer (specifically a Byte-Level BPE tokenizer, similar to GPT-2)
+on your specific dataset of Books and Wikipedia articles.
+
+After running this, the folder OUTPUT_DIR will contain:
+
+    vocab.json
+    merges.txt
+    tokenizer.json
+    tokenizer_config.json
+    special_tokens_map.json
+"""
+
+
 import os
 import glob
 from tokenizers.implementations import ByteLevelBPETokenizer
 from transformers import GPT2TokenizerFast
 
 # --- CONFIGURATION ---
-OUTPUT_DIR = "custom_tokenizer_files"
+OUTPUT_DIR = "../mh_sa_custom_transformer_01_01/custom_tokenizer_files"
 VOCAB_SIZE = 50258
 MIN_FREQUENCY = 2
 
 DATA_FOLDERS = [
     "../../../Datasets/Txt_Books/",
-    "../../../Datasets/Au_Books/",
+    "../../../Datasets/Txt_Au_Books/",
     "../../../Datasets/WikipediaDump/Final_Training_Data"
 ]
 

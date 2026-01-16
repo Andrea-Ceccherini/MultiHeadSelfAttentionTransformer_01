@@ -3,6 +3,9 @@ import torch.nn as nn
 import torch
 import numpy as np
 import torch.nn.functional as F
+import os
+import json
+
 
 NUM_LAYERS = 12
 D_MODEL = 768
@@ -96,6 +99,7 @@ def load_liver_tokenizer():
         # Load from local folder
 
         tokenizer_ = PreTrainedTokenizerFast.from_pretrained(tokenizer_path_)
+        # tokenizer_ = get_tokenizer(tokenizer_path_)
         print("load_liver_tokenizer() - Local tokenizer found")
 
         # Ensure special tokens are set
@@ -203,3 +207,77 @@ def scaled_dot_product_attention(query, key, value, mask=None):
     attention_weights = F.softmax(scores, dim=-1)
     output = torch.matmul(attention_weights, value)
     return output, attention_weights
+
+def create_model_configuration(model_save_dir_, input_vocab_size_, target_vocab_size_, d_model_, num_heads_, d_ff_, num_layers_, max_len_, dropout_):
+    print("create_model_configuration() - BEGIN")
+    config = {
+        "architectures": ["CustomTransformer"],
+        "input_vocab_size": input_vocab_size_,
+        "target_vocab_size": target_vocab_size_,
+        "d_model": d_model_,
+        "num_heads": num_heads_,
+        "d_ff": d_ff_,
+        "num_layers": num_layers_,
+        "max_len": max_len_,
+        "dropout": dropout_
+    }
+    with open(os.path.join(model_save_dir_, "config.json"), "w") as f:
+        json.dump(config, f, indent=4)
+    print("create_model_configuration() - Config saved.")
+    print("create_model_configuration() - END")
+
+#---------------------------------------------------
+
+
+
+def get_tokenizer(tokenizer_path_):
+    """
+    Loads a tokenizer using the 'tokenizers' library (Rust backend)
+    instead of 'transformers'.
+    """
+    import os
+    from tokenizers import Tokenizer
+
+    # 1. Resolve the path to 'tokenizer.json'
+    # Transformers loads from a folder, but 'tokenizers' typically loads a specific file.
+    json_path = os.path.join(tokenizer_path_, "tokenizer.json")
+
+    if not os.path.exists(json_path):
+        # Check if the user provided the full file path instead of a folder
+        if os.path.exists(tokenizer_path_) and os.path.isfile(tokenizer_path_):
+            json_path = tokenizer_path_
+        else:
+            raise FileNotFoundError(f"Could not find tokenizer.json in {tokenizer_path_}")
+
+    # 2. Load the raw tokenizer
+    raw_tokenizer = Tokenizer.from_file(json_path)
+
+    # 3. Create a Wrapper for Compatibility
+    # The 'transformers' library adds properties like .pad_token and __len__.
+    # The 'tokenizers' library does not have these, so we create a simple wrapper
+    # to make it compatible with your existing code.
+    class TokenizerWrapper:
+        def __init__(self, inner):
+            self._inner = inner
+            # Define standard GPT-2 special tokens manually
+            self.eos_token = "<|endoftext|>"
+            self.pad_token = None
+
+        def __len__(self):
+            return self._inner.get_vocab_size()
+
+        def __getattr__(self, name):
+            # Pass all other method calls (like encode, decode) to the real tokenizer
+            return getattr(self._inner, name)
+
+        @property
+        def eos_token_id(self):
+            return self._inner.token_to_id(self.eos_token)
+
+        @property
+        def pad_token_id(self):
+            if self.pad_token:
+                return self._inner.token_to_id(self.pad_token)
+            return None
+
+    return TokenizerWrapper(raw_tokenizer)

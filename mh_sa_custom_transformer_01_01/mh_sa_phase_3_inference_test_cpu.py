@@ -14,7 +14,7 @@ from mh_sa_algorithms_for_custom_transformer_model import (
 
 # --- PATHS ---
 # Point to your new CPU-trained Phase 2 model
-MODEL_PATH = "supervised_model_weights/fine_tuned_best.safetensors"
+MODEL_PATH = "../mh_sa_custom_transformer_01_01/supervised_model_weights/fine_tuned_best.safetensors"
 DEVICE = "cpu"
 
 

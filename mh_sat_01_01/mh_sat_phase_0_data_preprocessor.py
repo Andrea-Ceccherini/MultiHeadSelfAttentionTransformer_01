@@ -24,7 +24,7 @@ from mh_sat_algorithms_for_custom_transformer_model import load_gpt2_tokenizer
 OUTPUT_FILE = "../wiki_books_dataset/wiki_books_dataset.bin"
 DATA_FOLDERS = [
     "../../../Datasets/Txt_Books/",
-    "../../../Datasets/Au_Books/",
+    "../../../Datasets/Txt_Au_Books/",
     "../../../Datasets/WikipediaDump/Final_Training_Data"
 ]
 

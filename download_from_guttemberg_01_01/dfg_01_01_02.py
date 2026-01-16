@@ -47,7 +47,7 @@ def download_gutenberg_australia_text(download_url_, output_dir_):
 
 if __name__ == "__main__":
 
-    folder_document_path = "../../../Datasets/Au_Books/"
+    folder_document_path = "../../../Datasets/Txt_Au_Books/"
 
     download_url_list_a = ["https://gutenberg.net.au/ebooks03/0301501.txt",
                            "https://gutenberg.net.au/ebooks02/0200041.txt",

@@ -11,6 +11,7 @@
 *.safetensors
 /mh_sat_01_01/__pycache__/
 /mh_sat_01_01/supervised_model_weights/
+/mh_sat_01_01/unsupervised_model_weights/
 /mh_sat_01_01/onnx_model_distribution_format/
 *.data
 /mh_sat_01_01/hugging_face_model_distribution_format/
@@ -19,3 +20,7 @@
 *.json
 /bin_dataset/
 /mh_sa_custom_transformer_01_01/__pycache__/
+/mh_sa_custom_transformer_01_01/supervised_model_weights/
+/mh_sa_custom_transformer_01_01/unsupervised_model_weights/
+/mh_sa_custom_transformer_01_01/custom_tokenizer_files/
+/mh_sa_custom_transformer_01_01/bin_dataset/

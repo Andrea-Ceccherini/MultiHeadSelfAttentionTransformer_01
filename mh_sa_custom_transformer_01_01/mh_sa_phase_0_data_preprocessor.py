@@ -29,8 +29,9 @@ from datetime import datetime
 OUTPUT_FILE = "bin_dataset/wiki_books_dataset.bin"
 DATA_FOLDERS = [
     "../../../Datasets/Txt_Books/",
-    "../../../Datasets/Au_Books/",
-    "../../../Datasets/WikipediaDump/Final_Training_Data"
+    "../../../Datasets/Txt_Au_Books/",
+    "../../../Datasets/Txt_WikipediaData/",
+    "../../../Datasets/WikipediaDump/Txt_Final_Training_Data"
 ]
 
 
