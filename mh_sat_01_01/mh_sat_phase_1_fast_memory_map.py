@@ -78,7 +78,7 @@ from mh_sat_algorithms_for_custom_transformer_model import (
 )
 
 # --- CONFIGURATION ---
-DATA_BIN_PATH = "../wiki_books_dataset/wiki_books_dataset.bin"
+DATA_BIN_PATH = "../mh_sat_01_01/wiki_books_dataset/wiki_books_dataset.bin"
 TOKENIZATION_MAX_LENGTH = 256
 NUM_LAYERS = 12
 D_MODEL = 768

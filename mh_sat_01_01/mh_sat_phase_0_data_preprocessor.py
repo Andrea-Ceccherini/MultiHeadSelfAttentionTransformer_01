@@ -21,11 +21,11 @@ from tqdm import tqdm  # pip install tqdm
 from mh_sat_algorithms_for_custom_transformer_model import load_gpt2_tokenizer
 
 # --- CONFIGURATION ---
-OUTPUT_FILE = "../wiki_books_dataset/wiki_books_dataset.bin"
+OUTPUT_FILE = "wiki_books_dataset/wiki_books_dataset.bin"
 DATA_FOLDERS = [
     "../../../Datasets/Txt_Books/",
     "../../../Datasets/Txt_Au_Books/",
-    "../../../Datasets/WikipediaDump/Final_Training_Data"
+    "../../../Datasets/WikipediaDump/Txt_Final_Training_Data"
 ]
 
 

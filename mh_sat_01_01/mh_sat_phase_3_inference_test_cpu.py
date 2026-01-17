@@ -136,8 +136,8 @@ if __name__ == "__main__":
     device = "cpu"
 
     liver_csv = "../../../Datasets/LiverDataset/liver_questions_and_answers_999.csv"
-    wiki_txt = "../../../Datasets/WikipediaDump/Final_Training_Data/train_chunk_001.txt"
-    pretrained_path = os.path.join("../mh_sat_01_01/unsupervised_model_weights", "phase1_FINAL_3.77.safetensors")
+    wiki_txt = "../../../Datasets/WikipediaDump/Txt_Final_Training_Data/train_chunk_001.txt"
+    pretrained_path = os.path.join("../mh_sat_01_01/unsupervised_model_weights", "fine_tuned_best.safetensors")
     save_dir = "../mh_sat_01_01/supervised_model_weights"
 
     tokenizer, vocab_size = load_gpt2_tokenizer()

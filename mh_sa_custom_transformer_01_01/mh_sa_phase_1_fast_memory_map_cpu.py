@@ -27,30 +27,21 @@ Run the following command before running this script
     If you update your PyTorch version or GPU drivers.
 
 this script get the data from file wiki_books_dataset.bin and create .safetensors file
-GPU Time (RX 9070 XT): Estimated ~3 to 5 days.
+CPU Time (Ryzen 7): Estimated 4 to 8 Weeks (running 24/7).
 """
-
-
 
 import os
 import sys
 import numpy as np
 from datetime import datetime
+from tqdm import tqdm  # For progress bar
 
-# --- CRITICAL HARDWARE FIX (RDNA 4) ---
-os.environ["HSA_OVERRIDE_GFX_VERSION"] = "11.0.3"
-
-# --- SYSTEM CONFIGURATION ---
+# --- FORCE CPU MODE ---
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ["PYTORCH_ALLOC_CONF"] = "max_split_size_mb:128"
-os.environ.pop("AMD_SERIALIZE_KERNEL", None)
-os.environ['LD_LIBRARY_PATH'] = '/opt/rocm/lib:' + os.environ.get('LD_LIBRARY_PATH', '')
-
-# Debug logging to verify compilation isn't frozen
-os.environ["AMD_LOG_LEVEL"] = "3" 
 
 import torch
-import torch.nn as nn
+from safetensors.torch import load_file
 from torch.utils.data import Dataset, DataLoader
 from safetensors.torch import save_file
 
@@ -59,12 +50,12 @@ from mh_sa_algorithms_for_custom_transformer_model import (
 )
 
 # --- CONFIGURATION ---
-DATA_BIN_PATH = "../mh_sa_custom_transformer_01_01/bin_dataset/wiki_books_dataset.bin" # Adjusted to match your pre-processor output
-CHECKPOINT_DIR = "../mh_sa_custom_transformer_01_01/unsupervised_model_weights"
+DATA_BIN_PATH = "bin_dataset/wiki_books_dataset.bin"
+CHECKPOINT_DIR = "unsupervised_model_weights"  # Relative to script, if not in subfolder. Adjust if needed.
 
-# --- STABLE TRAINING PARAMS ---
-BATCH_SIZE = 4
-ACCUMULATION_STEPS = 8
+# --- STABLE TRAINING PARAMS (CPU) ---
+BATCH_SIZE = 2  # Even smaller for CPU, to manage RAM
+ACCUMULATION_STEPS = 16  # Effective Batch Size = 32 (Matches previous good runs)
 LEARNING_RATE = 1e-4
 
 
@@ -84,64 +75,57 @@ class MemoryMapDataset(Dataset):
         return {'input_ids': chunk}
 
 
-def train_fast(epochs_, dataloader_, device_, optimizer_, criterion_, model_, save_dir_):
-    print("train_fast() - BEGIN")
-    print("Moving model to GPU (Compiling kernels... wait 2-5 mins)...")
+def train_fast_cpu(epochs_, dataloader_, device_, optimizer_, criterion_, model_, save_dir_):
+    print("train_fast_cpu() - BEGIN")
+    print(f"Training on device: {device_} (FORCED CPU)")
     model_.to(device_)
     model_.train()
-    print("✅ Model on GPU.")
 
-    scaler = torch.amp.GradScaler("cuda")
     steps = 0
     total_loss = 0
-    optimizer_.zero_grad(set_to_none=True)
+    optimizer_.zero_grad(set_to_none=True)  # Good practice even for CPU
 
     for epoch in range(epochs_):
         print(f"\n--- Epoch {epoch + 1}/{epochs_} ---")
 
-        for i, batch in enumerate(dataloader_):
+        # Progress bar
+        progress_bar = tqdm(enumerate(dataloader_), total=len(dataloader_), desc=f"Epoch {epoch + 1}", unit="batch")
+
+        for i, batch in progress_bar:
             src_data = batch['input_ids'].to(device_)
             decoder_input = src_data[:, :-1]
             labels = src_data[:, 1:]
 
-            with torch.autocast("cuda", dtype=torch.float16):
-                output = model_(src_data, decoder_input)
-                loss = criterion_(output.reshape(-1, output.shape[-1]), labels.reshape(-1))
+            # Standard Forward Pass (FP32, CPU) - No autocast, no scaler
+            output = model_(src_data, decoder_input)
+            loss = criterion_(output.reshape(-1, output.shape[-1]), labels.reshape(-1))
 
-                if torch.isnan(loss):
-                    print(f"\n⚠️ WARNING: NaN detected at batch {i}. Skipping update.")
-                    optimizer_.zero_grad(set_to_none=True)
-                    continue
+            if torch.isnan(loss):
+                print(f"\n⚠️ WARNING: NaN detected at batch {i}. Skipping update.")
+                optimizer_.zero_grad(set_to_none=True)
+                continue
 
-                loss = loss / ACCUMULATION_STEPS
-
-            scaler.scale(loss).backward()
-
-            current_loss_val = loss.item() * ACCUMULATION_STEPS
-            total_loss += current_loss_val
+            loss = loss / ACCUMULATION_STEPS
+            loss.backward()
 
             if (i + 1) % ACCUMULATION_STEPS == 0:
-                scaler.unscale_(optimizer_)
-                torch.nn.utils.clip_grad_norm_(model_.parameters(), 1.0)
-
-                scaler.step(optimizer_)
-                scaler.update()
+                torch.nn.utils.clip_grad_norm_(model_.parameters(), 1.0)  # Still good for stability
+                optimizer_.step()
                 optimizer_.zero_grad(set_to_none=True)
                 steps += 1
 
-                if steps % 100 == 0:
-                    avg = total_loss / (i + 1) # Note: 'i' is batches, not steps, but close enough for logging
-                    print(f"\rStep {steps} | Loss: {current_loss_val:.4f}", end="", flush=True)
+                current_loss = loss.item() * ACCUMULATION_STEPS
+                total_loss += current_loss
+                progress_bar.set_postfix(loss=f"{current_loss:.4f}", avg_loss=f"{(total_loss / steps):.4f}")
 
-                if steps % 1000 == 0:
-                    print(f"\n   💾 Saving Checkpoint at Step {steps}...")
-                    os.makedirs(save_dir_, exist_ok=True)
-                    save_file(model_.state_dict(), os.path.join(save_dir_, "latest_checkpoint.safetensors"))
-                    torch.cuda.empty_cache()
+        avg = total_loss / steps if steps > 0 else 0
+        print(f"\n✅ Epoch {epoch + 1} Finished. Avg Loss: {avg:.4f}")
 
-        print(f"\nEpoch {epoch + 1} Complete.")
-        torch.cuda.empty_cache()
-    print("train_fast() - END")
+        os.makedirs(save_dir_, exist_ok=True)
+        save_file(model_.state_dict(), os.path.join(save_dir_, "latest_checkpoint.safetensors"))
+        # No empty_cache for CPU
+
+    print("train_fast_cpu() - END")
 
 
 if __name__ == "__main__":
@@ -150,8 +134,7 @@ if __name__ == "__main__":
 
     # 1. Verify Data Exists
     if not os.path.exists(DATA_BIN_PATH):
-        print(f"❌ Error: {DATA_BIN_PATH} not found.")
-        print("Did you run the preprocessor inside the correct folder?")
+        print(f"❌ Error: {DATA_BIN_PATH} not found. Run the preprocessor script first!")
         sys.exit(1)
 
     # 2. Load Custom Tokenizer
@@ -163,18 +146,17 @@ if __name__ == "__main__":
         num_layers=NUM_LAYERS, max_len=TOKENIZATION_MAX_LENGTH, dropout=DROPOUT
     )
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # FORCE CPU
+    device = torch.device("cpu")
     print(f"Device: {device}")
 
-    # 3. Resume Logic (Fixed Paths)
-    # We look in the same place we save to: CHECKPOINT_DIR
+    # 3. Resume Logic
     checkpoint_path = os.path.join(CHECKPOINT_DIR, "latest_checkpoint.safetensors")
 
     if os.path.exists(checkpoint_path):
         print(f"🔄 Found checkpoint: {checkpoint_path}")
         print("   Loading weights to RESUME training...")
         try:
-            from safetensors.torch import load_file
             model.load_state_dict(load_file(checkpoint_path))
             print("   ✅ Resume successful!")
         except Exception as e:
@@ -187,17 +169,17 @@ if __name__ == "__main__":
 
     dataloader = DataLoader(
         dataset,
-        batch_size=BATCH_SIZE,
-        shuffle=True,
-        num_workers=4,
-        pin_memory=True
+        batch_size=BATCH_SIZE,  # Physical Batch Size (e.g., 2 sentences at a time)
+        shuffle=True,  # Essential for good learning
+        num_workers=4,  # Use multiple CPU cores for data loading
+        pin_memory=True  # Speeds up CPU-to-CPU data transfer
     )
 
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-    criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
+    criterion = torch.nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
 
     # Train
-    train_fast(1, dataloader, device, optimizer, criterion, model, CHECKPOINT_DIR)
+    train_fast_cpu(1, dataloader, device, optimizer, criterion, model, CHECKPOINT_DIR)
 
     print(f"Elapsed: {datetime.now() - begin_time}")
     print("__main__() - END")

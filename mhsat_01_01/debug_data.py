@@ -1,7 +1,7 @@
 import numpy as np
 from mhsat_algorithms_for_custom_transformer_model_01_01_01 import load_gpt2_tokenizer
 
-DATA_PATH = "../wiki_books_dataset/wiki_books_dataset.bin"
+DATA_PATH = "../mh_sat_01_01/wiki_books_dataset/wiki_books_dataset.bin"
 
 def inspect_data():
     if not os.path.exists(DATA_PATH):
