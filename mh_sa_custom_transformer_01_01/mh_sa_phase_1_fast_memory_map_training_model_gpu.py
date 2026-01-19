@@ -38,7 +38,7 @@ import numpy as np
 from datetime import datetime
 
 # --- CRITICAL HARDWARE FIX (RDNA 4) ---
-os.environ["HSA_OVERRIDE_GFX_VERSION"] = "11.0.3"
+os.environ["HSA_OVERRIDE_GFX_VERSION"] = "12.0.1"
 
 # --- SYSTEM CONFIGURATION ---
 os.environ["TOKENIZERS_PARALLELISM"] = "false"

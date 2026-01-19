@@ -137,8 +137,21 @@ if __name__ == "__main__":
 
     liver_csv = "../../../Datasets/LiverDataset/liver_questions_and_answers_999.csv"
     wiki_txt = "../../../Datasets/WikipediaDump/Txt_Final_Training_Data/train_chunk_001.txt"
-    pretrained_path = os.path.join("../mh_sat_01_01/unsupervised_model_weights", "fine_tuned_best.safetensors")
+    pretrained_path = os.path.join("../mh_sat_01_01/unsupervised_model_weights", "latest_checkpoint_27000.safetensors")
     save_dir = "../mh_sat_01_01/supervised_model_weights"
+
+    # 1. Check Required Files
+    required_files = [
+        (liver_csv, "Liver CSV"),
+        (wiki_txt, "Wikipedia Text"),
+        (pretrained_path, "Pretrained Model")
+    ]
+
+    for path, description in required_files:
+        if not os.path.exists(path):
+            print(f"❌ CRITICAL ERROR: {description} not found.")
+            print(f"   Looking for: {os.path.abspath(path)}")
+            sys.exit(1)  # Quit immediately with error code 1
 
     tokenizer, vocab_size = load_gpt2_tokenizer()
 

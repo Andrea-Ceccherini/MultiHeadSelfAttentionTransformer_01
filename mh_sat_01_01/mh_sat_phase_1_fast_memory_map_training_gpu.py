@@ -1,5 +1,5 @@
 """
-This script (mh_sat_phase_1_fast_memory_map.py) is the core "Brain Builder". It performs the heavy lifting of teaching the
+This script (mh_sat_phase_1_fast_memory_map_training_gpu.py) is the core "Brain Builder". It performs the heavy lifting of teaching the
 neural network how to understand and generate English.
 
 The train_fast function is a classic Deep Learning training loop.
