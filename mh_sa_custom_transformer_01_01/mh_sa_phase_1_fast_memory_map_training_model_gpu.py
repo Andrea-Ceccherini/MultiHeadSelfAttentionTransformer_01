@@ -84,6 +84,25 @@ class MemoryMapDataset(Dataset):
         return {'input_ids': chunk}
 
 
+def estimate_model_memory(model_, batch_size, max_len, precision="fp16"):
+    total_params = sum(p.numel() for p in model_.parameters())
+    bytes_per_param = 4 if precision == "fp32" else 2
+
+    model_weights_mb = (total_params * bytes_per_param) / (1024 ** 2)
+    gradients_mb = (total_params * bytes_per_param) / (1024 ** 2)
+    optimizer_mb = (total_params * 8) / (1024 ** 2)
+    if precision != "fp32":
+        optimizer_mb += (total_params * 4) / (1024 ** 2)
+
+    activations_mb = (batch_size * max_len * total_params * 0.00001)
+
+    print(f"\n--- 🧠 ANALISI PARAMETRI E MEMORIA ({precision.upper()}) ---")
+    print(f"Parametri Totali:    {total_params / 1e6:.2f} Milioni")
+    print(f"Solo Pesi (Inference): {model_weights_mb:.2f} MB")
+    print(f"Training (Pesi + Grad + Opt): ~{model_weights_mb + gradients_mb + optimizer_mb + activations_mb:.2f} MB")
+    print(f"---------------------------------------------------\n")
+
+
 def train_fast(epochs_, dataloader_, device_, optimizer_, criterion_, model_, save_dir_):
     print("train_fast() - BEGIN")
     print("Moving model to GPU (Compiling kernels... wait 2-5 mins)...")
@@ -162,6 +181,8 @@ if __name__ == "__main__":
         d_model=D_MODEL, num_heads=NUM_HEADS, d_ff=D_FF,
         num_layers=NUM_LAYERS, max_len=TOKENIZATION_MAX_LENGTH, dropout=DROPOUT
     )
+
+    estimate_model_memory(model, BATCH_SIZE, TOKENIZATION_MAX_LENGTH, precision="fp16")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
