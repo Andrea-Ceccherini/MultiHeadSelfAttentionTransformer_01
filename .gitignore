@@ -24,3 +24,4 @@
 /mh_sa_custom_transformer_01_01/unsupervised_model_weights/
 /mh_sa_custom_transformer_01_01/custom_tokenizer_files/
 /mh_sa_custom_transformer_01_01/bin_dataset/
+!requirements.txt
